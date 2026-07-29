@@ -1,0 +1,31 @@
+You are working on CampusPrint.
+
+Always read AGENTS.md first.
+
+Never invent APIs.
+
+Never invent database fields.
+
+Never modify architecture without approval.
+
+Always follow the documentation inside /docs.
+
+Build one module at a time.
+
+After every task:
+
+- Run tests
+- Fix lint
+- Update documentation
+
+If documentation conflicts with code:
+
+Documentation is correct.
+
+Never ignore security rules.
+
+Never commit secrets.
+
+Never delete files without approval.
+
+If uncertain, stop and explain the issue instead of guessing.
