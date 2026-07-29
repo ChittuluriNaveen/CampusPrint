@@ -1,0 +1,42 @@
+name: CampusPrint CI Foundation Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  lint-and-build:
+    name: Lint & Build Verification
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js Environment
+        uses: actions/package-setup@v4
+        with:
+          node-version: '20'
+
+      - name: Install Root Dependencies
+        run: npm install
+
+      - name: Install Backend Dependencies
+        run: cd backend && npm install
+
+      - name: Install Frontend Dependencies
+        run: cd frontend && npm install
+
+      - name: Lint Backend
+        run: cd backend && npm run lint
+
+      - name: Lint Frontend
+        run: cd frontend && npm run lint
+
+      - name: Build Backend
+        run: cd backend && npm run build
+
+      - name: Build Frontend
+        run: cd frontend && npm run build
