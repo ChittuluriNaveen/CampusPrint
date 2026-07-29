@@ -1,28 +1,46 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
+import { Navbar } from '../components/navigation/Navbar';
+import { Sidebar } from '../components/navigation/Sidebar';
+import { MobileMenu } from '../components/navigation/MobileMenu';
+import { Footer } from '../components/navigation/Footer';
+import { LayoutDashboard, FileText, Clock, Settings, User } from 'lucide-react';
 
 export const MainLayout: React.FC = () => {
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const navItems = [
+    { label: 'Overview', path: '/', icon: <LayoutDashboard className="w-4 h-4" /> },
+    { label: 'Student Portal', path: '/student', icon: <User className="w-4 h-4" /> },
+    { label: 'Admin Portal', path: '/admin', icon: <FileText className="w-4 h-4" /> },
+    { label: 'Order History', path: '/orders', icon: <Clock className="w-4 h-4" /> },
+    { label: 'Settings', path: '/settings', icon: <Settings className="w-4 h-4" /> },
+  ];
+
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50 text-gray-900">
-      <header className="bg-white border-b border-gray-200 py-4 px-6 shadow-sm">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <div className="flex items-center space-x-3">
-            <span className="text-2xl">🖨️</span>
-            <span className="font-bold text-xl tracking-tight text-blue-700">CampusPrint</span>
-          </div>
-          <div className="text-sm font-medium text-gray-500">
-            System Foundation v1.0.0
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen flex flex-col bg-bg-light dark:bg-bg-dark text-slate-900 dark:text-slate-100 transition-colors">
+      <Navbar onToggleMobileMenu={() => setIsMobileMenuOpen(true)} />
 
-      <main className="flex-grow max-w-7xl w-full mx-auto p-6">
-        <Outlet />
-      </main>
+      <MobileMenu
+        isOpen={isMobileMenuOpen}
+        onClose={() => setIsMobileMenuOpen(false)}
+        items={navItems}
+      />
 
-      <footer className="bg-white border-t border-gray-200 py-4 text-center text-xs text-gray-500">
-        © {new Date().getFullYear()} CampusPrint — Campus Printing Management System. All rights reserved.
-      </footer>
+      <div className="flex-1 flex w-full max-w-7xl mx-auto">
+        <Sidebar
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          items={navItems}
+        />
+
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 min-w-0">
+          <Outlet />
+        </main>
+      </div>
+
+      <Footer />
     </div>
   );
 };
