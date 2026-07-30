@@ -11,6 +11,11 @@ jobs:
     name: Lint & Build Verification
     runs-on: ubuntu-latest
 
+    env:
+      DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/campusprint?schema=public"
+      NODE_ENV: test
+      JWT_SECRET: default_ci_jwt_secret_key_campusprint_12345
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -20,10 +25,7 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: |
-            package-lock.json
-            backend/package-lock.json
-            frontend/package-lock.json
+          cache-dependency-path: '**/package-lock.json'
 
       - name: Install Root Dependencies
         run: npm ci
