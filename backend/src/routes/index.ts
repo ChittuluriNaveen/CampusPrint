@@ -1,4 +1,5 @@
 import { Request, Response, Router } from 'express';
+import adminDashboardRoutes from './admin-dashboard.routes';
 import adminOrderRoutes from './admin-order.routes';
 import adminUserRoutes from './admin-user.routes';
 import authRoutes from './auth.routes';
@@ -25,6 +26,7 @@ const apiV1Router = Router();
 apiV1Router.get('/health', healthHandler);
 apiV1Router.use('/auth', authRoutes);
 apiV1Router.use('/users', userRoutes);
+apiV1Router.use('/admin/dashboard', adminDashboardRoutes);
 apiV1Router.use('/admin/users', adminUserRoutes);
 apiV1Router.use('/documents', documentRoutes);
 apiV1Router.use('/orders', orderRoutes);

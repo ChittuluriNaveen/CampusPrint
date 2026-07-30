@@ -10,6 +10,15 @@ import { SettingsPage } from '../pages/settings/SettingsPage';
 import { DesignSystemOverview } from '../pages/DesignSystemOverview';
 import { PlaceholderPage } from '../pages/PlaceholderPage';
 
+// Admin Operations Pages
+import { AdminDashboardOverview } from '../pages/admin/AdminDashboardOverview';
+import { AdminUserManagementPage } from '../pages/admin/AdminUserManagementPage';
+import { AdminOrderManagementPage } from '../pages/admin/AdminOrderManagementPage';
+import { AdminQueueManagementPage } from '../pages/admin/AdminQueueManagementPage';
+import { AdminPricingConfigPage } from '../pages/admin/AdminPricingConfigPage';
+import { AdminPaymentManagementPage } from '../pages/admin/AdminPaymentManagementPage';
+import { AdminDocumentManagementPage } from '../pages/admin/AdminDocumentManagementPage';
+
 export const AppRoutes: React.FC = () => {
   return (
     <Routes>
@@ -24,6 +33,15 @@ export const AppRoutes: React.FC = () => {
         <Route path="student/cart" element={<CartPage />} />
         <Route path="student/payments" element={<PaymentHistoryPage />} />
         <Route path="settings" element={<SettingsPage />} />
+
+        {/* Admin Dashboard Operations Center Routes */}
+        <Route path="admin" element={<AdminDashboardOverview />} />
+        <Route path="admin/users" element={<AdminUserManagementPage />} />
+        <Route path="admin/orders" element={<AdminOrderManagementPage />} />
+        <Route path="admin/queue" element={<AdminQueueManagementPage />} />
+        <Route path="admin/pricing" element={<AdminPricingConfigPage />} />
+        <Route path="admin/payments" element={<AdminPaymentManagementPage />} />
+        <Route path="admin/documents" element={<AdminDocumentManagementPage />} />
 
         {/* Design System Reference */}
         <Route path="design-system" element={<DesignSystemOverview />} />
@@ -46,18 +64,6 @@ export const AppRoutes: React.FC = () => {
               title="Student Registration"
               description="Institutional student account registration and email verification."
               category="Authentication"
-            />
-          }
-        />
-
-        {/* Admin Desk Placeholder */}
-        <Route
-          path="admin"
-          element={
-            <PlaceholderPage
-              title="Admin Queue & Operations Dashboard"
-              description="Real-time print shop queue manager, job printer assignment, price configurator, and analytics."
-              category="Admin Portal"
             />
           }
         />
