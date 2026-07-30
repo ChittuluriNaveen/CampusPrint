@@ -1,7 +1,9 @@
 import { Request, Response, Router } from 'express';
+import adminOrderRoutes from './admin-order.routes';
 import adminUserRoutes from './admin-user.routes';
 import authRoutes from './auth.routes';
 import documentRoutes from './document.routes';
+import orderRoutes from './order.routes';
 import userRoutes from './user.routes';
 
 const router = Router();
@@ -21,6 +23,8 @@ apiV1Router.use('/auth', authRoutes);
 apiV1Router.use('/users', userRoutes);
 apiV1Router.use('/admin/users', adminUserRoutes);
 apiV1Router.use('/documents', documentRoutes);
+apiV1Router.use('/orders', orderRoutes);
+apiV1Router.use('/admin/orders', adminOrderRoutes);
 
 // Mount versioned router
 router.use('/v1', apiV1Router);
