@@ -1,9 +1,10 @@
 import React from 'react';
-import { Printer, Sun, Moon, Menu, Bell } from 'lucide-react';
+import { Printer, Sun, Moon, Menu } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Avatar } from '../ui/Avatar';
 import { Dropdown } from '../ui/Dropdown';
 import { Button } from '../ui/Button';
+import { NotificationBell } from './NotificationBell';
 
 export interface NavbarProps {
   onToggleMobileMenu?: () => void;
@@ -59,15 +60,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileMenu, portalName =
             {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-600" />}
           </Button>
 
-          <Button
-            variant="ghost"
-            size="sm"
-            aria-label="Notifications"
-            className="p-2 rounded-lg text-slate-600 dark:text-slate-300 relative"
-          >
-            <Bell className="w-4 h-4" />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-brand-600" />
-          </Button>
+          <NotificationBell />
 
           <div className="h-4 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1 hidden sm:block" />
 

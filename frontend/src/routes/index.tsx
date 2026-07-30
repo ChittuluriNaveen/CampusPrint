@@ -6,6 +6,7 @@ import { DocumentManagementPage } from '../pages/documents/DocumentManagementPag
 import { OrdersPage } from '../pages/orders/OrdersPage';
 import { CartPage } from '../pages/cart/CartPage';
 import { PaymentHistoryPage } from '../pages/payments/PaymentHistoryPage';
+import { NotificationsPage } from '../pages/notifications/NotificationsPage';
 import { SettingsPage } from '../pages/settings/SettingsPage';
 import { DesignSystemOverview } from '../pages/DesignSystemOverview';
 import { PlaceholderPage } from '../pages/PlaceholderPage';
@@ -32,6 +33,7 @@ export const AppRoutes: React.FC = () => {
         <Route path="student/orders" element={<OrdersPage />} />
         <Route path="student/cart" element={<CartPage />} />
         <Route path="student/payments" element={<PaymentHistoryPage />} />
+        <Route path="student/notifications" element={<NotificationsPage />} />
         <Route path="settings" element={<SettingsPage />} />
 
         {/* Admin Dashboard Operations Center Routes */}

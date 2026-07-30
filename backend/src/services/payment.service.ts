@@ -1,8 +1,9 @@
-import { OrderStatus, PaymentStatus, UserRole } from '@prisma/client';
+import { NotificationType, OrderStatus, PaymentStatus, UserRole } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../services/auth.service';
 import { clearUserCart } from '../services/cart.service';
 import { paymentGateway } from '../services/gateway.service';
+import { createNotification } from './notification.service';
 import { VerifyPaymentInput } from '../validators/payment.validator';
 
 export const createPaymentSession = async (userId: string, orderId: string) => {
@@ -133,6 +134,18 @@ export const verifyPayment = async (userId: string, input: VerifyPaymentInput) =
     await clearUserCart(userId);
   } catch (err) {
     // Graceful fallback
+  }
+
+  // Trigger Notification for Payment Success
+  try {
+    await createNotification(
+      userId,
+      'Payment Successful',
+      `Payment of ₹${order.total.toFixed(2)} received for Order ${order.orderNumber}. Your order is now queued for printing.`,
+      NotificationType.SUCCESS
+    );
+  } catch (err) {
+    // Notification error fallback
   }
 
   await prisma.activityLog.create({

@@ -1,6 +1,7 @@
-import { OrderStatus, Prisma, UserRole } from '@prisma/client';
+import { NotificationType, OrderStatus, Prisma, UserRole } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../services/auth.service';
+import { createNotification } from './notification.service';
 import { generateJobNumber } from '../utils/jobNumber';
 import {
   AssignOperatorInput,
@@ -233,14 +234,33 @@ export const updatePrintJobStatus = async (
     return updated;
   });
 
-  await prisma.activityLog.create({
-    data: {
-      actorId,
-      action: 'PRINT_JOB_STATUS_CHANGED',
-      entity: 'PrintJob',
-      entityId: jobId,
-    },
-  });
+  // Trigger Notification for Order Status Advancement
+  try {
+    if (input.status === OrderStatus.PRINTING) {
+      await createNotification(
+        updatedJob.order.userId,
+        'Printing Started',
+        `Your print job ${updatedJob.jobNumber} for Order ${updatedJob.order.orderNumber} is now printing.`,
+        NotificationType.INFO
+      );
+    } else if (input.status === OrderStatus.READY) {
+      await createNotification(
+        updatedJob.order.userId,
+        'Order Ready for Pickup',
+        `Your print job ${updatedJob.jobNumber} for Order ${updatedJob.order.orderNumber} is completed and ready for collection!`,
+        NotificationType.SUCCESS
+      );
+    } else if (input.status === OrderStatus.CANCELLED) {
+      await createNotification(
+        updatedJob.order.userId,
+        'Print Job Cancelled',
+        `Your print job ${updatedJob.jobNumber} for Order ${updatedJob.order.orderNumber} was cancelled.`,
+        NotificationType.WARNING
+      );
+    }
+  } catch (err) {
+    // Notification error fallback
+  }
 
   return updatedJob;
 };
