@@ -20,3 +20,22 @@ export const validateRequest = (schema: ZodSchema) => {
     }
   };
 };
+
+export const validateQuery = (schema: ZodSchema) => {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      req.query = await schema.parseAsync(req.query);
+      next();
+    } catch (error) {
+      if (error instanceof ZodError) {
+        const formattedErrors = error.errors.map(err => ({
+          field: err.path.join('.'),
+          message: err.message,
+        }));
+        sendError(res, 400, 'Validation failed', formattedErrors);
+        return;
+      }
+      next(error);
+    }
+  };
+};

@@ -7,6 +7,7 @@ import documentRoutes from './document.routes';
 import orderRoutes from './order.routes';
 import paymentRoutes from './payment.routes';
 import pricingRoutes from './pricing.routes';
+import printJobRoutes from './printJob.routes';
 import userRoutes from './user.routes';
 
 const router = Router();
@@ -33,6 +34,7 @@ apiV1Router.use('/cart', cartRoutes);
 apiV1Router.use('/checkout', cartRoutes);
 apiV1Router.use('/payments', paymentRoutes);
 apiV1Router.use('/admin/payments', paymentRoutes);
+apiV1Router.use('/print-jobs', printJobRoutes);
 
 // Mount versioned router
 router.use('/v1', apiV1Router);

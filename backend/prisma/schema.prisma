@@ -96,6 +96,7 @@ model User {
   notifications Notification[]
   activityLogs ActivityLog[]
   cart         Cart?
+  assignedJobs PrintJob[]   @relation("OperatorJobs")
 
   @@index([email])
   @@index([studentId])
@@ -142,6 +143,7 @@ model Order {
   files               OrderFile[]
   payment             Payment?
   cartItems           CartItem[]
+  printJob            PrintJob?
 
   @@index([orderNumber])
   @@index([userId])
@@ -227,6 +229,31 @@ model Payment {
   @@index([razorpayPaymentId])
   @@index([paymentStatus])
   @@map("payments")
+}
+
+model PrintJob {
+  id            String      @id @default(uuid())
+  jobNumber     String      @unique
+  orderId       String      @unique
+  operatorId    String?
+  queuePosition Int         @default(1)
+  priority      Int         @default(1) // 1: Normal, 2: High, 3: Urgent
+  status        OrderStatus @default(QUEUED)
+  startedAt     DateTime?
+  completedAt   DateTime?
+  notes         String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  order         Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  operator      User?       @relation("OperatorJobs", fields: [operatorId], references: [id], onDelete: SetNull)
+
+  @@index([jobNumber])
+  @@index([orderId])
+  @@index([operatorId])
+  @@index([status])
+  @@index([priority, queuePosition])
+  @@map("print_jobs")
 }
 
 model Pricing {
