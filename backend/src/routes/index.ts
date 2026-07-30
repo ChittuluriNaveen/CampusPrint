@@ -1,5 +1,7 @@
 import { Request, Response, Router } from 'express';
+import adminUserRoutes from './admin-user.routes';
 import authRoutes from './auth.routes';
+import userRoutes from './user.routes';
 
 const router = Router();
 
@@ -15,6 +17,8 @@ const healthHandler = (_req: Request, res: Response): void => {
 const apiV1Router = Router();
 apiV1Router.get('/health', healthHandler);
 apiV1Router.use('/auth', authRoutes);
+apiV1Router.use('/users', userRoutes);
+apiV1Router.use('/admin/users', adminUserRoutes);
 
 // Mount versioned router
 router.use('/v1', apiV1Router);
