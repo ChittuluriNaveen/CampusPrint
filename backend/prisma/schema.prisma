@@ -95,6 +95,7 @@ model User {
   documents    Document[]
   notifications Notification[]
   activityLogs ActivityLog[]
+  cart         Cart?
 
   @@index([email])
   @@index([studentId])
@@ -140,6 +141,7 @@ model Order {
   user                User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   files               OrderFile[]
   payment             Payment?
+  cartItems           CartItem[]
 
   @@index([orderNumber])
   @@index([userId])
@@ -174,6 +176,35 @@ model OrderFile {
 
   @@index([orderId])
   @@map("order_files")
+}
+
+model Cart {
+  id        String     @id @default(uuid())
+  userId    String     @unique
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     CartItem[]
+
+  @@map("carts")
+}
+
+model CartItem {
+  id        String   @id @default(uuid())
+  cartId    String
+  orderId   String
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, orderId])
+  @@index([cartId])
+  @@index([orderId])
+  @@map("cart_items")
 }
 
 model Payment {

@@ -2,6 +2,7 @@ import { Request, Response, Router } from 'express';
 import adminOrderRoutes from './admin-order.routes';
 import adminUserRoutes from './admin-user.routes';
 import authRoutes from './auth.routes';
+import cartRoutes from './cart.routes';
 import documentRoutes from './document.routes';
 import orderRoutes from './order.routes';
 import pricingRoutes from './pricing.routes';
@@ -27,6 +28,8 @@ apiV1Router.use('/documents', documentRoutes);
 apiV1Router.use('/orders', orderRoutes);
 apiV1Router.use('/admin/orders', adminOrderRoutes);
 apiV1Router.use('/pricing', pricingRoutes);
+apiV1Router.use('/cart', cartRoutes);
+apiV1Router.use('/checkout', cartRoutes);
 
 // Mount versioned router
 router.use('/v1', apiV1Router);
