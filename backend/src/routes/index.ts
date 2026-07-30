@@ -1,4 +1,5 @@
 import { Request, Response, Router } from 'express';
+import analyticsRoutes from './analytics.routes';
 import adminDashboardRoutes from './admin-dashboard.routes';
 import adminOrderRoutes from './admin-order.routes';
 import adminUserRoutes from './admin-user.routes';
@@ -39,6 +40,7 @@ apiV1Router.use('/payments', paymentRoutes);
 apiV1Router.use('/admin/payments', paymentRoutes);
 apiV1Router.use('/print-jobs', printJobRoutes);
 apiV1Router.use('/notifications', notificationRoutes);
+apiV1Router.use('/analytics', analyticsRoutes);
 
 // Mount versioned router
 router.use('/v1', apiV1Router);

@@ -19,6 +19,7 @@ import { AdminQueueManagementPage } from '../pages/admin/AdminQueueManagementPag
 import { AdminPricingConfigPage } from '../pages/admin/AdminPricingConfigPage';
 import { AdminPaymentManagementPage } from '../pages/admin/AdminPaymentManagementPage';
 import { AdminDocumentManagementPage } from '../pages/admin/AdminDocumentManagementPage';
+import { AdminAnalyticsReportsPage } from '../pages/admin/AdminAnalyticsReportsPage';
 
 export const AppRoutes: React.FC = () => {
   return (
@@ -44,6 +45,7 @@ export const AppRoutes: React.FC = () => {
         <Route path="admin/pricing" element={<AdminPricingConfigPage />} />
         <Route path="admin/payments" element={<AdminPaymentManagementPage />} />
         <Route path="admin/documents" element={<AdminDocumentManagementPage />} />
+        <Route path="admin/reports" element={<AdminAnalyticsReportsPage />} />
 
         {/* Design System Reference */}
         <Route path="design-system" element={<DesignSystemOverview />} />

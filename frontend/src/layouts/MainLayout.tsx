@@ -4,7 +4,7 @@ import { Navbar } from '../components/navigation/Navbar';
 import { Sidebar } from '../components/navigation/Sidebar';
 import { MobileMenu } from '../components/navigation/MobileMenu';
 import { Footer } from '../components/navigation/Footer';
-import { LayoutDashboard, FileText, Printer, ShoppingCart, CreditCard, Settings, ShieldAlert } from 'lucide-react';
+import { LayoutDashboard, FileText, Printer, ShoppingCart, CreditCard, Settings, ShieldAlert, BarChart3 } from 'lucide-react';
 
 export const MainLayout: React.FC = () => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -17,6 +17,7 @@ export const MainLayout: React.FC = () => {
     { label: 'Shopping Cart', path: '/student/cart', icon: <ShoppingCart className="w-4 h-4" /> },
     { label: 'Payment Receipts', path: '/student/payments', icon: <CreditCard className="w-4 h-4" /> },
     { label: 'Admin Desk', path: '/admin', icon: <ShieldAlert className="w-4 h-4" /> },
+    { label: 'Analytics & Reports', path: '/admin/reports', icon: <BarChart3 className="w-4 h-4" /> },
     { label: 'Settings', path: '/settings', icon: <Settings className="w-4 h-4" /> },
   ];
 
