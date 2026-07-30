@@ -1,5 +1,5 @@
 import winston from 'winston';
-import { env } from '../config/env.js';
+import { env } from '../config/env';
 
 const logFormat = winston.format.printf(({ level, message, timestamp, stack }) => {
   return `${timestamp} [${level.toUpperCase()}]: ${stack || message}`;

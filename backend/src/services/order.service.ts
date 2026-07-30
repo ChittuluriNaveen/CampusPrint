@@ -1,6 +1,7 @@
 import { OrderStatus, Prisma, UserRole } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../services/auth.service';
+import { calculateOrderPricing, ItemCostBreakdown } from '../services/pricing.service';
 import { generateOrderNumber } from '../utils/orderNumber';
 import { CreateOrderInput, OrderQueryInput, UpdateOrderInput } from '../validators/order.validator';
 
@@ -46,18 +47,32 @@ export const createOrder = async (userId: string, input: CreateOrderInput) => {
 
   const orderNumber = generateOrderNumber();
 
+  // Compute calculated prices using Pricing Engine
+  const pricingResult = await calculateOrderPricing({
+    items: input.files.map(f => ({
+      pages: f.pageCount,
+      copies: f.copies,
+      paperSize: f.paperSize,
+      colourMode: f.colourMode,
+      duplexMode: f.duplexMode,
+      binding: f.binding,
+      lamination: f.lamination,
+      coverPage: f.coverPage,
+    })),
+  });
+
   const newOrder = await prisma.$transaction(async tx => {
     const order = await tx.order.create({
       data: {
         orderNumber,
         userId,
         status: OrderStatus.DRAFT,
-        subtotal: 0,
-        tax: 0,
-        total: 0,
+        subtotal: pricingResult.subtotal,
+        tax: pricingResult.tax,
+        total: pricingResult.total,
         remarks: input.remarks,
         files: {
-          create: input.files.map(f => ({
+          create: input.files.map((f, idx) => ({
             originalFileName: f.originalFileName,
             storedFileName: f.storedFileName,
             mimeType: f.mimeType,
@@ -73,7 +88,7 @@ export const createOrder = async (userId: string, input: CreateOrderInput) => {
             coverPage: f.coverPage,
             pageRange: f.pageRange,
             specialInstructions: f.specialInstructions,
-            calculatedPrice: 0,
+            calculatedPrice: pricingResult.items[idx]?.itemSubtotal || 0,
           })),
         },
       },
@@ -213,20 +228,46 @@ export const updateOrder = async (
   }
 
   const updatedOrder = await prisma.$transaction(async tx => {
+    let subtotal = order.subtotal;
+    let tax = order.tax;
+    let total = order.total;
+    let itemBreakdowns: ItemCostBreakdown[] = [];
+
     if (input.files && input.files.length > 0) {
       await tx.orderFile.deleteMany({
         where: { orderId },
       });
+
+      const pricingResult = await calculateOrderPricing({
+        items: input.files.map(f => ({
+          pages: f.pageCount,
+          copies: f.copies,
+          paperSize: f.paperSize,
+          colourMode: f.colourMode,
+          duplexMode: f.duplexMode,
+          binding: f.binding,
+          lamination: f.lamination,
+          coverPage: f.coverPage,
+        })),
+      });
+
+      subtotal = pricingResult.subtotal;
+      tax = pricingResult.tax;
+      total = pricingResult.total;
+      itemBreakdowns = pricingResult.items;
     }
 
     const res = await tx.order.update({
       where: { id: orderId },
       data: {
+        subtotal,
+        tax,
+        total,
         ...(input.remarks !== undefined && { remarks: input.remarks }),
         ...(input.files &&
           input.files.length > 0 && {
             files: {
-              create: input.files.map(f => ({
+              create: input.files.map((f, idx) => ({
                 originalFileName: f.originalFileName,
                 storedFileName: f.storedFileName,
                 mimeType: f.mimeType,
@@ -242,7 +283,7 @@ export const updateOrder = async (
                 coverPage: f.coverPage,
                 pageRange: f.pageRange,
                 specialInstructions: f.specialInstructions,
-                calculatedPrice: 0,
+                calculatedPrice: itemBreakdowns[idx]?.itemSubtotal || 0,
               })),
             },
           }),

@@ -1,10 +1,10 @@
-import express, { Express } from 'express';
 import cors from 'cors';
+import express, { Express } from 'express';
 import helmet from 'helmet';
-import { env } from './config/env.js';
-import { requestLogger } from './middleware/logger.middleware.js';
-import { errorHandler } from './middleware/error.middleware.js';
-import { apiRouter, healthHandler } from './routes/index.js';
+import { env } from './config/env';
+import { errorHandler } from './middleware/error.middleware';
+import { requestLogger } from './middleware/logger.middleware';
+import { apiRouter, healthHandler } from './routes/index';
 
 const app: Express = express();
 

@@ -4,6 +4,7 @@ import adminUserRoutes from './admin-user.routes';
 import authRoutes from './auth.routes';
 import documentRoutes from './document.routes';
 import orderRoutes from './order.routes';
+import pricingRoutes from './pricing.routes';
 import userRoutes from './user.routes';
 
 const router = Router();
@@ -25,6 +26,7 @@ apiV1Router.use('/admin/users', adminUserRoutes);
 apiV1Router.use('/documents', documentRoutes);
 apiV1Router.use('/orders', orderRoutes);
 apiV1Router.use('/admin/orders', adminOrderRoutes);
+apiV1Router.use('/pricing', pricingRoutes);
 
 // Mount versioned router
 router.use('/v1', apiV1Router);
