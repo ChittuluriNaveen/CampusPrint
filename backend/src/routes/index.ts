@@ -13,6 +13,8 @@ import pricingRoutes from './pricing.routes';
 import printJobRoutes from './printJob.routes';
 import userRoutes from './user.routes';
 
+import healthRoutes from './health.routes';
+
 const router = Router();
 
 const healthHandler = (_req: Request, res: Response): void => {
@@ -26,6 +28,7 @@ const healthHandler = (_req: Request, res: Response): void => {
 // API v1 router
 const apiV1Router = Router();
 apiV1Router.get('/health', healthHandler);
+apiV1Router.use('/health', healthRoutes);
 apiV1Router.use('/auth', authRoutes);
 apiV1Router.use('/users', userRoutes);
 apiV1Router.use('/admin/dashboard', adminDashboardRoutes);

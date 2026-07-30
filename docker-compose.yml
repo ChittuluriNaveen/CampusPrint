@@ -1,16 +1,23 @@
 version: '3.8'
 
 services:
-  mongodb:
-    image: mongo:7.0
-    container_name: campusprint-mongodb
+  postgres:
+    image: postgres:16-alpine
+    container_name: campusprint-postgres
     restart: always
-    ports:
-      - "27017:27017"
     environment:
-      MONGO_INITDB_DATABASE: campusprint
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-campusprint}
+    ports:
+      - "5432:5432"
     volumes:
-      - mongodb_data:/data/db
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   backend:
     build:
@@ -23,10 +30,18 @@ services:
     environment:
       NODE_ENV: production
       PORT: 5000
-      MONGODB_URI: mongodb://mongodb:27017/campusprint
-      CLIENT_URL: http://localhost
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-campusprint}?schema=public
+      JWT_SECRET: ${JWT_SECRET:-campusprint_production_jwt_signing_secret_key_2026}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-rzp_test_mock}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-rzp_secret_mock}
+      UPLOAD_DIR: /app/uploads
+      CORS_ORIGIN: "*"
+    volumes:
+      - uploads_data:/app/uploads
     depends_on:
-      - mongodb
+      postgres:
+        condition: service_healthy
 
   frontend:
     build:
@@ -40,4 +55,5 @@ services:
       - backend
 
 volumes:
-  mongodb_data:
+  postgres_data:
+  uploads_data:

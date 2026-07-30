@@ -1,18 +1,15 @@
-# Multi-stage Dockerfile for CampusPrint Backend API Server
+# Multi-stage Dockerfile for CampusPrint Backend (Root Context)
 FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Install dependencies
-COPY backend/package*.json ./
-COPY backend/prisma ./prisma/
+COPY package*.json ./
+COPY prisma ./prisma/
 RUN npm ci
 
-# Copy source code and build
-COPY backend/ ./
+COPY ./ ./
 RUN npm run build
 
-# Production runtime stage
 FROM node:20-alpine AS runner
 
 WORKDIR /app
@@ -20,16 +17,14 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=5000
 
-# Security: Create non-root user
 RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001
 
-COPY backend/package*.json ./
-COPY backend/prisma ./prisma/
+COPY package*.json ./
+COPY prisma ./prisma/
 RUN npm ci --only=production && npx prisma generate
 
 COPY --from=builder /app/dist ./dist
 
-# Create uploads directory and assign ownership
 RUN mkdir -p uploads && chown -R nodejs:nodejs /app
 
 USER nodejs
