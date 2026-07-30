@@ -5,6 +5,7 @@ import authRoutes from './auth.routes';
 import cartRoutes from './cart.routes';
 import documentRoutes from './document.routes';
 import orderRoutes from './order.routes';
+import paymentRoutes from './payment.routes';
 import pricingRoutes from './pricing.routes';
 import userRoutes from './user.routes';
 
@@ -30,6 +31,8 @@ apiV1Router.use('/admin/orders', adminOrderRoutes);
 apiV1Router.use('/pricing', pricingRoutes);
 apiV1Router.use('/cart', cartRoutes);
 apiV1Router.use('/checkout', cartRoutes);
+apiV1Router.use('/payments', paymentRoutes);
+apiV1Router.use('/admin/payments', paymentRoutes);
 
 // Mount versioned router
 router.use('/v1', apiV1Router);
