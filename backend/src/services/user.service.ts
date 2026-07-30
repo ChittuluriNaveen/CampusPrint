@@ -1,4 +1,4 @@
-import { Prisma, UserRole, UserStatus } from '@prisma/client';
+import { OrderStatus, Prisma, UserRole, UserStatus } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../services/auth.service';
 import { AuthenticatedUser } from '../types/auth';
@@ -34,6 +34,112 @@ const sanitizeUser = (user: {
   createdAt: user.createdAt,
   updatedAt: user.updatedAt,
 });
+
+export const getStudentDashboardSummary = async (userId: string) => {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      studentId: true,
+      department: true,
+      year: true,
+      avatar: true,
+      role: true,
+    },
+  });
+
+  if (!user) {
+    throw new AppError(404, 'Student account not found');
+  }
+
+  const [
+    totalDocuments,
+    activeOrdersCount,
+    completedOrdersCount,
+    pendingPaymentsCount,
+    paidOrders,
+    recentOrders,
+    recentDocuments,
+    userCart,
+  ] = await Promise.all([
+    prisma.document.count({
+      where: { userId, deletedAt: null },
+    }),
+    prisma.order.count({
+      where: {
+        userId,
+        deletedAt: null,
+        status: {
+          in: [
+            OrderStatus.DRAFT,
+            OrderStatus.PAYMENT_PENDING,
+            OrderStatus.PAID,
+            OrderStatus.QUEUED,
+            OrderStatus.PRINTING,
+            OrderStatus.QUALITY_CHECK,
+            OrderStatus.READY,
+          ],
+        },
+      },
+    }),
+    prisma.order.count({
+      where: { userId, deletedAt: null, status: OrderStatus.COLLECTED },
+    }),
+    prisma.order.count({
+      where: {
+        userId,
+        deletedAt: null,
+        status: { in: [OrderStatus.DRAFT, OrderStatus.PAYMENT_PENDING] },
+      },
+    }),
+    prisma.order.findMany({
+      where: {
+        userId,
+        deletedAt: null,
+        status: { in: [OrderStatus.PAID, OrderStatus.COLLECTED, OrderStatus.READY] },
+      },
+      select: { total: true },
+    }),
+    prisma.order.findMany({
+      where: { userId, deletedAt: null },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+      include: {
+        files: true,
+        payment: { select: { paymentStatus: true, razorpayPaymentId: true, amount: true } },
+        printJob: { select: { jobNumber: true, status: true, priority: true, queuePosition: true } },
+      },
+    }),
+    prisma.document.findMany({
+      where: { userId, deletedAt: null },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+    }),
+    prisma.cart.findUnique({
+      where: { userId },
+      include: { items: true },
+    }),
+  ]);
+
+  const totalSpent = paidOrders.reduce((sum, ord) => sum + ord.total, 0);
+  const cartItemCount = userCart?.items?.reduce((sum, item) => sum + item.quantity, 0) || 0;
+
+  return {
+    studentProfile: user,
+    stats: {
+      totalDocuments,
+      activeOrders: activeOrdersCount,
+      completedOrders: completedOrdersCount,
+      pendingPayments: pendingPaymentsCount,
+      totalSpent: Math.round(totalSpent * 100) / 100,
+      cartItemCount,
+    },
+    recentOrders,
+    recentDocuments,
+  };
+};
 
 export const updateUserProfile = async (
   userId: string,

@@ -15,7 +15,7 @@
     "db:push": "prisma db push",
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
-    "test": "ts-node src/__tests__/auth.test.ts && ts-node src/__tests__/user.test.ts && ts-node src/__tests__/document.test.ts && ts-node src/__tests__/order.test.ts && ts-node src/__tests__/pricing.test.ts && ts-node src/__tests__/cart.test.ts && ts-node src/__tests__/payment.test.ts && ts-node src/__tests__/printJob.test.ts"
+    "test": "ts-node src/__tests__/auth.test.ts && ts-node src/__tests__/user.test.ts && ts-node src/__tests__/document.test.ts && ts-node src/__tests__/order.test.ts && ts-node src/__tests__/pricing.test.ts && ts-node src/__tests__/cart.test.ts && ts-node src/__tests__/payment.test.ts && ts-node src/__tests__/printJob.test.ts && ts-node src/__tests__/dashboard.test.ts"
   },
   "prisma": {
     "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"

@@ -1,6 +1,12 @@
 import React from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { MainLayout } from '../layouts/MainLayout';
+import { StudentDashboard } from '../pages/dashboard/StudentDashboard';
+import { DocumentManagementPage } from '../pages/documents/DocumentManagementPage';
+import { OrdersPage } from '../pages/orders/OrdersPage';
+import { CartPage } from '../pages/cart/CartPage';
+import { PaymentHistoryPage } from '../pages/payments/PaymentHistoryPage';
+import { SettingsPage } from '../pages/settings/SettingsPage';
 import { DesignSystemOverview } from '../pages/DesignSystemOverview';
 import { PlaceholderPage } from '../pages/PlaceholderPage';
 
@@ -8,13 +14,27 @@ export const AppRoutes: React.FC = () => {
   return (
     <Routes>
       <Route path="/" element={<MainLayout />}>
-        <Route index element={<DesignSystemOverview />} />
+        {/* Default redirect to Student Portal */}
+        <Route index element={<Navigate to="/student" replace />} />
+        
+        {/* Student Self-Service Dashboard Routes */}
+        <Route path="student" element={<StudentDashboard />} />
+        <Route path="student/documents" element={<DocumentManagementPage />} />
+        <Route path="student/orders" element={<OrdersPage />} />
+        <Route path="student/cart" element={<CartPage />} />
+        <Route path="student/payments" element={<PaymentHistoryPage />} />
+        <Route path="settings" element={<SettingsPage />} />
+
+        {/* Design System Reference */}
+        <Route path="design-system" element={<DesignSystemOverview />} />
+
+        {/* Authentication Placeholders */}
         <Route
           path="login"
           element={
             <PlaceholderPage
               title="Student & Admin Authentication Login"
-              description="User authentication, JWT token handling, and role-based login forms will be implemented in Phase 03."
+              description="User authentication, JWT token handling, and role-based login forms."
               category="Authentication"
             />
           }
@@ -24,21 +44,13 @@ export const AppRoutes: React.FC = () => {
           element={
             <PlaceholderPage
               title="Student Registration"
-              description="Institutional student account registration and email verification will be implemented in Phase 03."
+              description="Institutional student account registration and email verification."
               category="Authentication"
             />
           }
         />
-        <Route
-          path="student"
-          element={
-            <PlaceholderPage
-              title="Student Print Portal & Quick Upload"
-              description="Student document upload drawer, live print cost calculator, and active order tracker."
-              category="Student Portal"
-            />
-          }
-        />
+
+        {/* Admin Desk Placeholder */}
         <Route
           path="admin"
           element={
@@ -49,36 +61,8 @@ export const AppRoutes: React.FC = () => {
             />
           }
         />
-        <Route
-          path="profile"
-          element={
-            <PlaceholderPage
-              title="User Account Profile"
-              description="Student ID, institutional credentials, department, and contact information management."
-              category="Account"
-            />
-          }
-        />
-        <Route
-          path="orders"
-          element={
-            <PlaceholderPage
-              title="Print Order History & Receipts"
-              description="Complete list of past print requests, payment receipts, invoice PDF downloads, and re-order triggers."
-              category="Orders"
-            />
-          }
-        />
-        <Route
-          path="settings"
-          element={
-            <PlaceholderPage
-              title="System & Theme Settings"
-              description="Theme preferences, notification options, and institutional print parameters."
-              category="Settings"
-            />
-          }
-        />
+
+        {/* Catch-all 404 Route */}
         <Route
           path="*"
           element={
