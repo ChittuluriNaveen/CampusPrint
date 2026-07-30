@@ -10,8 +10,10 @@ const envSchema = z.object({
   CLIENT_URL: z.string().default('http://localhost:3000'),
   DATABASE_URL: z.string().default('postgresql://postgres:postgres@localhost:5432/campusprint?schema=public'),
   MONGODB_URI: z.string().default('mongodb://localhost:27017/campusprint'),
-  JWT_SECRET: z.string().default('default_development_jwt_secret_key_campusprint'),
+  JWT_SECRET: z.string().default('default_development_jwt_secret_key_campusprint_12345'),
   JWT_EXPIRES_IN: z.string().default('1d'),
+  JWT_REFRESH_SECRET: z.string().default('default_development_jwt_refresh_secret_key_campusprint_67890'),
+  JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
   UPLOAD_PATH: z.string().default('./uploads'),
 });
 
