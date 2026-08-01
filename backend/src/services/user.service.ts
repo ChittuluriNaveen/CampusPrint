@@ -15,6 +15,7 @@ const sanitizeUser = (user: {
   year: number | null;
   phone: string | null;
   avatar: string | null;
+  mustChangePassword?: boolean;
   isVerified: boolean;
   status: UserStatus;
   createdAt: Date;
@@ -29,6 +30,7 @@ const sanitizeUser = (user: {
   year: user.year,
   phone: user.phone,
   avatar: user.avatar,
+  mustChangePassword: user.mustChangePassword ?? false,
   isVerified: user.isVerified,
   status: user.status,
   createdAt: user.createdAt,
@@ -209,7 +211,7 @@ export const changeUserPassword = async (
 
   await prisma.user.update({
     where: { id: userId },
-    data: { password: hashedNewPassword },
+    data: { password: hashedNewPassword, mustChangePassword: false },
   });
 
   await prisma.activityLog.create({
@@ -220,6 +222,52 @@ export const changeUserPassword = async (
       entityId: userId,
     },
   });
+};
+
+export const createUserByAdmin = async (
+  adminId: string,
+  input: {
+    name: string;
+    email: string;
+    role: UserRole;
+    department?: string | null;
+    password?: string;
+  }
+): Promise<AuthenticatedUser> => {
+  const existingUser = await prisma.user.findUnique({
+    where: { email: input.email },
+  });
+
+  if (existingUser) {
+    throw new AppError(409, 'User email address is already registered');
+  }
+
+  const rawPassword = input.password || 'TempPass@123';
+  const hashedPassword = await hashPassword(rawPassword);
+
+  const newUser = await prisma.user.create({
+    data: {
+      name: input.name,
+      email: input.email,
+      password: hashedPassword,
+      role: input.role,
+      department: input.department || 'Administration',
+      mustChangePassword: true,
+      isVerified: true,
+      status: UserStatus.ACTIVE,
+    },
+  });
+
+  await prisma.activityLog.create({
+    data: {
+      actorId: adminId,
+      action: 'ADMIN_USER_CREATED',
+      entity: 'User',
+      entityId: newUser.id,
+    },
+  });
+
+  return sanitizeUser(newUser);
 };
 
 export const adminListUsers = async (query: UserQueryInput) => {

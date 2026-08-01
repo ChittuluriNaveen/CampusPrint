@@ -1,4 +1,4 @@
-# Phase 05 — User Profile & User Management
+# Phase 05 — User & Profile Management
 
 Version: 1.0
 
@@ -8,21 +8,29 @@ Status: Ready for Implementation
 
 # Objective
 
-Implement complete User Profile & Admin User Management capabilities for CampusPrint.
+Implement the complete User & Profile Management module for CampusPrint.
 
-This phase enables authenticated users to view/update their profile information and change passwords securely, while empowering administrators to list, filter, view, update role/status, and soft-delete user accounts.
+This phase focuses on user profile management after authentication has been completed.
+
+Users should be able to securely manage their own account information.
+
+Administrators should be able to manage users according to the project's RBAC rules.
+
+This phase must NOT implement any print-order functionality or business workflows.
 
 ---
 
 # Documentation
 
-Read ONLY the following:
+Before implementation, read ONLY:
 
 - reports/Phase-04-Report.md
-- docs/06_Database_Design.md
-- docs/07_API_Specification.md
-- docs/08_Authentication.md
+- docs/08_User_Management.md
+- docs/12_Security.md
+- docs/16_Project_Structure.md
 - docs/29_Coding_Standards.md
+
+Do NOT reread previous implementation prompts.
 
 ---
 
@@ -30,23 +38,31 @@ Read ONLY the following:
 
 Implement ONLY:
 
-✓ User profile retrieval (`GET /users/profile` & `GET /users/me`)
+✓ Current User Profile
 
-✓ User profile update (`PATCH /users/profile`)
+✓ Profile Update
 
-✓ User password change (`PATCH /users/password`)
+✓ Change Password
 
-✓ Admin list users (`GET /admin/users` with pagination, search, role & status filters)
+✓ Profile Photo Support (if defined in documentation)
 
-✓ Admin get user by ID (`GET /admin/users/:id`)
+✓ User Preferences
 
-✓ Admin update user status/role (`PATCH /admin/users/:id`)
+✓ Account Status
 
-✓ Admin soft delete user (`DELETE /admin/users/:id`)
+✓ User Management APIs
 
-✓ Request validation schemas (Zod)
+✓ Admin User Management
 
-✓ Audit logging for profile updates & user status changes
+✓ User Search
+
+✓ User Filtering
+
+✓ Pagination
+
+✓ Validation
+
+✓ Audit Logging (if documented)
 
 ---
 
@@ -54,40 +70,326 @@ Implement ONLY:
 
 Do NOT implement:
 
+❌ Print Orders
+
 ❌ File Upload
 
-❌ Order Creation / Management
+❌ Pricing
 
-❌ Payment Integration
+❌ Payments
 
-❌ Pricing Calculation
+❌ Notifications
 
-❌ Notifications System
+❌ Analytics
 
-❌ Reporting System
+❌ Dashboards
+
+❌ Printing Workflow
+
+❌ Business Logic
 
 ---
 
-# Validation & Security Requirements
+# Technology
 
-- Profile updates must disallow updating sensitive fields (`id`, `password`, `role`, `status`, `isVerified`).
-- Password changes require verifying current password via bcrypt before updating to new hashed password.
-- Password change must enforce password strength rules (min 8 chars, uppercase, lowercase, number).
-- Admin user operations require `authenticate` and `authorize(UserRole.ADMIN, UserRole.SUPER_ADMIN)` middlewares.
-- Admin user deletion must execute soft-delete (`deletedAt = new Date()`), preserving relational integrity.
-- All endpoints must return standard API response envelopes (`sendSuccess`, `sendError`).
+Use the existing project stack.
+
+Use the existing authentication system implemented in Phase 04.
+
+Do NOT replace authentication.
+
+---
+
+# User Features
+
+Authenticated users should be able to:
+
+- View profile
+- Edit profile
+- Change password
+- View account information
+- Manage personal preferences
+- View assigned role
+
+Only allow modification of permitted fields.
+
+---
+
+# Admin Features
+
+If defined in the documentation, administrators can:
+
+- View users
+- Search users
+- Filter users
+- Update user status
+- Enable/Disable users
+- Assign roles
+- Reset passwords (if documented)
+
+Never allow privilege escalation.
 
 ---
 
 # API Endpoints
 
-User Endpoints:
-- `GET /api/v1/users/profile` (Protected - Student/Admin)
-- `PATCH /api/v1/users/profile` (Protected - Student/Admin)
-- `PATCH /api/v1/users/password` (Protected - Student/Admin)
+Implement only documented endpoints.
 
-Admin User Management Endpoints:
-- `GET /api/v1/admin/users` (Protected - Admin/Super Admin)
-- `GET /api/v1/admin/users/:id` (Protected - Admin/Super Admin)
-- `PATCH /api/v1/admin/users/:id` (Protected - Admin/Super Admin)
-- `DELETE /api/v1/admin/users/:id` (Protected - Admin/Super Admin)
+Typical examples:
+
+GET /users/me
+
+PUT /users/me
+
+PUT /users/me/password
+
+GET /users
+
+GET /users/:id
+
+PUT /users/:id
+
+PATCH /users/:id/status
+
+DELETE /users/:id (only if documentation specifies)
+
+---
+
+# Validation
+
+Validate:
+
+- Name
+- Email
+- Phone
+- Password
+- Required fields
+- Role updates
+
+Return consistent validation responses.
+
+---
+
+# Security
+
+Implement:
+
+Ownership checks
+
+Role validation
+
+Password verification
+
+Password hashing
+
+Protected routes
+
+Admin-only endpoints
+
+Input validation
+
+Prevent:
+
+Unauthorized updates
+
+Role escalation
+
+Password disclosure
+
+Mass assignment
+
+---
+
+# Database
+
+Reuse the existing Prisma models.
+
+Modify schema ONLY if documentation requires it.
+
+Generate migrations only when necessary.
+
+---
+
+# Middleware
+
+Reuse authentication middleware.
+
+Reuse authorization middleware.
+
+Add only profile-specific middleware if required.
+
+---
+
+# Services
+
+Create reusable services for:
+
+Profile
+
+User Management
+
+Password Management
+
+Search
+
+Pagination
+
+Avoid duplicated logic.
+
+---
+
+# Error Handling
+
+Handle:
+
+User not found
+
+Invalid password
+
+Duplicate email
+
+Permission denied
+
+Validation failures
+
+Database errors
+
+Return consistent API responses.
+
+---
+
+# Logging
+
+Log important events:
+
+Profile updated
+
+Password changed
+
+Account status changed
+
+Role changed
+
+Do NOT log passwords or sensitive information.
+
+---
+
+# Coding Standards
+
+Every implementation must:
+
+- Follow SOLID principles
+- Use TypeScript
+- Use async/await
+- Be reusable
+- Avoid duplicated logic
+- Be production-ready
+
+---
+
+# Validation Checklist
+
+Verify:
+
+✓ View profile works
+
+✓ Update profile works
+
+✓ Change password works
+
+✓ Password hashing preserved
+
+✓ Admin user management works
+
+✓ Search works
+
+✓ Pagination works
+
+✓ Authorization works
+
+✓ Build passes
+
+✓ Lint passes
+
+---
+
+# Deliverables
+
+Provide:
+
+1. User Management Architecture
+
+2. Profile Management Architecture
+
+3. APIs Created
+
+4. Services Created
+
+5. Middleware Added
+
+6. Validation Strategy
+
+7. Security Summary
+
+8. Build Status
+
+9. Lint Status
+
+10. Remaining Work
+
+---
+
+# Success Criteria
+
+This phase is complete only if:
+
+✓ Profile management is complete
+
+✓ User management is complete
+
+✓ Password management works
+
+✓ Role restrictions enforced
+
+✓ Build passes
+
+✓ Lint passes
+
+✓ No print-order functionality exists
+
+✓ No payment module exists
+
+✓ No dashboard implementation exists
+
+---
+
+# Final Instruction
+
+When implementation is complete:
+
+1. Run:
+
+- npm run build
+- npm run lint
+- tests (if applicable)
+
+2. Read:
+
+ai-prompts/shared/PHASE_COMPLETION_REPORT.md
+
+3. Generate:
+
+reports/Phase-05-Report.md
+
+4. Commit:
+
+git add .
+git commit -m "Phase 05: User and profile management"
+
+5. If a Git remote is configured:
+
+git push origin main
+
+Stop.
+
+Wait for approval before Phase 06.

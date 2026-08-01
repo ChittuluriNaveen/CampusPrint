@@ -3,9 +3,12 @@ import path from 'path';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../services/auth.service';
 import { deleteStoredFile, fileExists } from '../utils/storage';
+import { calculateDocumentPageCount } from '../utils/pageCounter';
 import { DocumentQueryInput } from '../validators/document.validator';
 
 export const uploadDocument = async (userId: string, file: Express.Multer.File) => {
+  const pageCount = await calculateDocumentPageCount(file.path, file.mimetype, file.originalname);
+
   const document = await prisma.document.create({
     data: {
       userId,
@@ -14,7 +17,7 @@ export const uploadDocument = async (userId: string, file: Express.Multer.File) 
       mimeType: file.mimetype,
       size: file.size,
       path: file.path,
-      pageCount: 1, // Default 1 page, future PDF processor will extract exact page count
+      pageCount,
       status: 'ACTIVE',
     },
   });
@@ -42,7 +45,7 @@ export const getUserDocuments = async (
 
   const whereClause: Prisma.DocumentWhereInput = {
     deletedAt: null,
-    ...(userRole !== UserRole.ADMIN && userRole !== UserRole.SUPER_ADMIN && { userId }),
+    ...(userRole !== UserRole.ADMIN && userRole !== UserRole.SUPER_ADMIN && userRole !== UserRole.OPERATOR && { userId }),
     ...(query.search && {
       originalFileName: {
         contains: query.search,
@@ -54,6 +57,16 @@ export const getUserDocuments = async (
   const [documents, total] = await Promise.all([
     prisma.document.findMany({
       where: whereClause,
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            studentId: true,
+          },
+        },
+      },
       skip,
       take: limit,
       orderBy: { createdAt: 'desc' },
@@ -90,7 +103,8 @@ export const getDocumentById = async (
   if (
     document.userId !== userId &&
     userRole !== UserRole.ADMIN &&
-    userRole !== UserRole.SUPER_ADMIN
+    userRole !== UserRole.SUPER_ADMIN &&
+    userRole !== UserRole.OPERATOR
   ) {
     throw new AppError(403, 'Access denied: You do not own this document');
   }

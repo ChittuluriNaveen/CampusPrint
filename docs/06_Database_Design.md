@@ -67,6 +67,7 @@ Stores authentication and profile information.
   year         Number     Optional
   phone        String     Optional
   avatar       String     Optional
+  mustChangePassword Boolean Optional
   isVerified   Boolean    Yes
   status       Enum       Yes
   createdAt    Date       Yes
@@ -75,6 +76,7 @@ Stores authentication and profile information.
 Role Enum
 
 -   STUDENT
+-   OPERATOR
 -   ADMIN
 -   SUPER_ADMIN
 
@@ -111,19 +113,30 @@ Represents a complete print order.
   total                 Number
   estimatedCompletion   Date
   remarks               String
+  pickupCode                 String
+  pickupCodeGeneratedAt      Date
+  pickupVerifiedAt           Date
+  pickupVerifiedBy           String
+  pickupVerificationAttempts Number
+  pickupVerificationMethod   String
   createdAt             Date
   updatedAt             Date
 
 Status
 
 -   DRAFT
+-   SUBMITTED
+-   PENDING_REVIEW
+-   ACCEPTED
 -   PAYMENT_PENDING
 -   PAID
 -   QUEUED
 -   PRINTING
 -   QUALITY_CHECK
--   READY
+-   READY_FOR_PICKUP
 -   COLLECTED
+-   COMPLETED
+-   REJECTED
 -   CANCELLED
 -   REFUNDED
 
@@ -132,6 +145,7 @@ Indexes
 -   orderNumber (unique)
 -   userId
 -   status
+-   pickupCode
 
 ------------------------------------------------------------------------
 
@@ -186,15 +200,23 @@ Indexes
 
 Fields
 
--   orderId
+-   orderId (unique)
+-   userId (optional foreign key)
+-   gateway (default: "RAZORPAY")
 -   razorpayOrderId
--   razorpayPaymentId
+-   razorpayPaymentId (unique)
 -   razorpaySignature
+-   transactionReference (unique)
 -   amount
 -   currency
 -   paymentMethod
 -   paymentStatus
+-   verifiedAt
+-   verificationStatus (default: "PENDING")
+-   refundStatus (default: "NONE")
 -   paidAt
+-   createdAt
+-   updatedAt
 
 Payment Status
 
@@ -205,8 +227,12 @@ Payment Status
 
 Indexes
 
+-   orderId (unique)
+-   userId
 -   razorpayPaymentId (unique)
--   orderId
+-   transactionReference (unique)
+-   paymentStatus
+-   createdAt
 
 ------------------------------------------------------------------------
 

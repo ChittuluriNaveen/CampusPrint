@@ -25,8 +25,8 @@ export const adminUpdateOrderStatusController = async (req: Request, res: Respon
       return;
     }
     const { id } = req.params;
-    const { status, remarks } = req.body;
-    const updatedOrder = await adminUpdateOrderStatus(id, req.user.id, status, remarks);
+    const { status, remarks, printerId } = req.body;
+    const updatedOrder = await adminUpdateOrderStatus(id, req.user.id, status, remarks, printerId);
     sendSuccess(res, 200, 'Order status updated successfully', updatedOrder);
   } catch (error) {
     if (error instanceof AppError) {

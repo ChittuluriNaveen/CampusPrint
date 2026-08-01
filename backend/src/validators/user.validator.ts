@@ -38,7 +38,18 @@ export const userQuerySchema = z.object({
   status: z.nativeEnum(UserStatus).optional(),
 });
 
+export const createUserByAdminSchema = z.object({
+  name: z.string().min(2, 'Name must be at least 2 characters long').max(100),
+  email: z.string().email('Invalid email address'),
+  role: z.nativeEnum(UserRole, {
+    errorMap: () => ({ message: 'Invalid role selection' }),
+  }),
+  department: z.string().optional().nullable(),
+  password: z.string().min(8, 'Password must be at least 8 characters long').optional(),
+});
+
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 export type AdminUpdateUserInput = z.infer<typeof adminUpdateUserSchema>;
 export type UserQueryInput = z.infer<typeof userQuerySchema>;
+export type CreateUserByAdminInput = z.infer<typeof createUserByAdminSchema>;

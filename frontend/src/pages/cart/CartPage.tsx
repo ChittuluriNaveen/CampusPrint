@@ -1,15 +1,21 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ShoppingCart, Trash2, Plus, Minus, CreditCard, ShieldCheck, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { apiClient } from '../../services/apiClient';
 
 interface CartItem {
   id: string;
   orderId: string;
+  orderNumber?: string;
   quantity: number;
-  order: {
-    orderNumber: string;
-    total: number;
-    files: Array<{ originalFileName: string; copies: number }>;
+  unitPrice?: number;
+  totalPrice?: number;
+  filesCount?: number;
+  orderStatus?: string;
+  order?: {
+    orderNumber?: string;
+    total?: number;
+    files?: Array<{ originalFileName: string; copies: number }>;
   };
 }
 
@@ -22,8 +28,8 @@ interface CartSummary {
 }
 
 export const CartPage: React.FC = () => {
+  const navigate = useNavigate();
   const [cart, setCart] = useState<CartSummary | null>(null);
-  const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const fetchCart = async () => {
@@ -39,22 +45,20 @@ export const CartPage: React.FC = () => {
           {
             id: 'ci-1',
             orderId: 'ord-101',
+            orderNumber: 'ORD-20260730-8819',
             quantity: 1,
-            order: {
-              orderNumber: 'ORD-20260730-8819',
-              total: 85.0,
-              files: [{ originalFileName: 'Algorithm_Design_Report.pdf', copies: 2 }],
-            },
+            unitPrice: 85.0,
+            totalPrice: 85.0,
+            filesCount: 1,
           },
           {
             id: 'ci-2',
             orderId: 'ord-102',
+            orderNumber: 'ORD-20260730-1092',
             quantity: 1,
-            order: {
-              orderNumber: 'ORD-20260730-1092',
-              total: 45.0,
-              files: [{ originalFileName: 'Lab_Manual_Ch3.pdf', copies: 1 }],
-            },
+            unitPrice: 45.0,
+            totalPrice: 45.0,
+            filesCount: 1,
           },
         ],
         itemCount: 2,
@@ -105,25 +109,9 @@ export const CartPage: React.FC = () => {
     }
   };
 
-  const handleProceedToPayment = async () => {
-    if (!cart?.items.length) return;
-    setCheckoutLoading(true);
-    setMessage(null);
-
-    try {
-      const orderId = cart.items[0].orderId;
-      const response = await apiClient.post('/payments/create', { orderId });
-      const session = response.data?.data;
-      setMessage({
-        type: 'success',
-        text: `Razorpay payment session created successfully! Order Reference: ${session?.razorpayOrderId || 'RZP-SESSION-READY'}`,
-      });
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to initiate payment session';
-      setMessage({ type: 'error', text: errorMessage });
-    } finally {
-      setCheckoutLoading(false);
-    }
+  const handleProceedToPayment = () => {
+    if (!cart?.items?.length) return;
+    navigate('/student/checkout');
   };
 
   return (
@@ -134,7 +122,7 @@ export const CartPage: React.FC = () => {
           <p className="text-sm text-slate-500">Review print orders before initiating secure online payment</p>
         </div>
 
-        {cart?.items.length ? (
+        {cart?.items?.length ? (
           <button
             onClick={handleClearCart}
             className="text-xs font-semibold text-rose-600 hover:text-rose-700 dark:text-rose-400 inline-flex items-center space-x-1"
@@ -158,7 +146,7 @@ export const CartPage: React.FC = () => {
         </div>
       )}
 
-      {!cart?.items.length ? (
+      {!cart?.items?.length ? (
         <div className="text-center py-16 bg-surface-light dark:bg-surface-dark border border-slate-200 dark:border-slate-800 rounded-2xl">
           <ShoppingCart className="w-12 h-12 text-slate-400 mx-auto mb-3" />
           <h3 className="text-base font-semibold text-slate-800 dark:text-slate-200">Your shopping cart is empty</h3>
@@ -170,56 +158,63 @@ export const CartPage: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Cart Items List */}
           <div className="lg:col-span-2 space-y-4">
-            {cart.items.map(item => (
-              <div
-                key={item.id}
-                className="bg-surface-light dark:bg-surface-dark border border-slate-200 dark:border-slate-800 rounded-2xl p-5 hover:shadow-sm transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4"
-              >
-                <div className="space-y-1 min-w-0">
-                  <span className="font-bold text-sm text-slate-900 dark:text-white">
-                    {item.order.orderNumber}
-                  </span>
-                  <p className="text-xs text-slate-500 truncate">
-                    📄 {item.order.files?.[0]?.originalFileName || 'Print Order File Package'}
-                  </p>
-                  <span className="text-xs font-semibold text-primary-600 dark:text-primary-400">
-                    ₹{item.order.total.toFixed(2)} per package
-                  </span>
-                </div>
+            {cart.items.map(item => {
+              const orderNum = item.orderNumber || item.order?.orderNumber || `ORD-${item.orderId.slice(0, 8)}`;
+              const unitPrice = item.unitPrice ?? item.order?.total ?? 0;
+              const itemTotal = item.totalPrice ?? (unitPrice * item.quantity);
+              const fileName = item.order?.files?.[0]?.originalFileName || `${item.filesCount || 1} Document File(s)`;
 
-                <div className="flex items-center justify-between sm:justify-end space-x-6">
-                  {/* Quantity Controls */}
-                  <div className="flex items-center space-x-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-                    <button
-                      onClick={() => handleUpdateQuantity(item.id, item.quantity, -1)}
-                      className="p-1 hover:bg-white dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300"
-                    >
-                      <Minus className="w-3.5 h-3.5" />
-                    </button>
-                    <span className="text-xs font-bold px-2">{item.quantity}</span>
-                    <button
-                      onClick={() => handleUpdateQuantity(item.id, item.quantity, 1)}
-                      className="p-1 hover:bg-white dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-
-                  <div className="text-right">
-                    <span className="text-sm font-bold text-slate-900 dark:text-white">
-                      ₹{(item.order.total * item.quantity).toFixed(2)}
+              return (
+                <div
+                  key={item.id}
+                  className="bg-surface-light dark:bg-surface-dark border border-slate-200 dark:border-slate-800 rounded-2xl p-5 hover:shadow-sm transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                >
+                  <div className="space-y-1 min-w-0">
+                    <span className="font-bold text-sm text-slate-900 dark:text-white">
+                      {orderNum}
+                    </span>
+                    <p className="text-xs text-slate-500 truncate">
+                      📄 {fileName}
+                    </p>
+                    <span className="text-xs font-semibold text-primary-600 dark:text-primary-400">
+                      ₹{unitPrice.toFixed(2)} per package
                     </span>
                   </div>
 
-                  <button
-                    onClick={() => handleRemoveItem(item.id)}
-                    className="p-2 hover:bg-rose-50 dark:hover:bg-rose-900/30 text-rose-600 dark:text-rose-400 rounded-xl transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center justify-between sm:justify-end space-x-6">
+                    {/* Quantity Controls */}
+                    <div className="flex items-center space-x-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+                      <button
+                        onClick={() => handleUpdateQuantity(item.id, item.quantity, -1)}
+                        className="p-1 hover:bg-white dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300"
+                      >
+                        <Minus className="w-3.5 h-3.5" />
+                      </button>
+                      <span className="text-xs font-bold px-2">{item.quantity}</span>
+                      <button
+                        onClick={() => handleUpdateQuantity(item.id, item.quantity, 1)}
+                        className="p-1 hover:bg-white dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    <div className="text-right">
+                      <span className="text-sm font-bold text-slate-900 dark:text-white">
+                        ₹{itemTotal.toFixed(2)}
+                      </span>
+                    </div>
+
+                    <button
+                      onClick={() => handleRemoveItem(item.id)}
+                      className="p-2 hover:bg-rose-50 dark:hover:bg-rose-900/30 text-rose-600 dark:text-rose-400 rounded-xl transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Checkout Preview Box */}
@@ -228,12 +223,12 @@ export const CartPage: React.FC = () => {
 
             <div className="space-y-3 text-xs border-b border-slate-100 dark:border-slate-800 pb-4">
               <div className="flex justify-between text-slate-600 dark:text-slate-400">
-                <span>Subtotal ({cart.itemCount} items)</span>
-                <span>₹{cart.subtotal.toFixed(2)}</span>
+                <span>Subtotal ({cart.itemCount || cart.items.length} items)</span>
+                <span>₹{(cart.subtotal || 0).toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-slate-600 dark:text-slate-400">
                 <span>GST Tax (18%)</span>
-                <span>₹{cart.tax.toFixed(2)}</span>
+                <span>₹{(cart.tax || 0).toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-slate-600 dark:text-slate-400">
                 <span>Pickup Station</span>
@@ -244,17 +239,16 @@ export const CartPage: React.FC = () => {
             <div className="flex justify-between items-center text-base font-bold text-slate-900 dark:text-white">
               <span>Grand Total</span>
               <span className="text-lg text-primary-600 dark:text-primary-400">
-                ₹{cart.grandTotal.toFixed(2)}
+                ₹{(cart.grandTotal || 0).toFixed(2)}
               </span>
             </div>
 
             <button
               onClick={handleProceedToPayment}
-              disabled={checkoutLoading}
-              className="w-full py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-xl transition-all shadow-md hover:shadow-lg flex items-center justify-center space-x-2 disabled:opacity-50"
+              className="w-full py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-xl transition-all shadow-md hover:shadow-lg flex items-center justify-center space-x-2"
             >
               <CreditCard className="w-4 h-4" />
-              <span>{checkoutLoading ? 'Initiating Gateway...' : 'Pay via Razorpay'}</span>
+              <span>Proceed to Checkout</span>
             </button>
 
             <div className="flex items-center justify-center space-x-2 text-[11px] text-slate-400">

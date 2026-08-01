@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { AppError } from '../services/auth.service';
-import { changeUserPassword, getStudentDashboardSummary, updateUserProfile } from '../services/user.service';
+import { changeUserPassword, createUserByAdmin, getStudentDashboardSummary, updateUserProfile } from '../services/user.service';
 import { sendError, sendSuccess } from '../utils/response';
 
 export const getStudentDashboardController = async (req: Request, res: Response): Promise<void> => {
@@ -52,5 +52,22 @@ export const changePasswordController = async (req: Request, res: Response): Pro
       return;
     }
     sendError(res, 500, 'Failed to change password');
+  }
+};
+
+export const createUserByAdminController = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      sendError(res, 401, 'Authentication required');
+      return;
+    }
+    const newUser = await createUserByAdmin(req.user.id, req.body);
+    sendSuccess(res, 201, 'Staff/Admin account created successfully', newUser);
+  } catch (error) {
+    if (error instanceof AppError) {
+      sendError(res, error.statusCode, error.message);
+      return;
+    }
+    sendError(res, 500, 'Failed to create user account');
   }
 };

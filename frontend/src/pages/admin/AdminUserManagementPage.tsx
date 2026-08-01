@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Users, Search, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
+import { Users, Search, CheckCircle, XCircle, RefreshCw, UserPlus, ShieldAlert, KeyRound, X } from 'lucide-react';
 import { apiClient } from '../../services/apiClient';
 
 interface UserItem {
@@ -7,6 +7,7 @@ interface UserItem {
   name: string;
   email: string;
   role: 'STUDENT' | 'OPERATOR' | 'ADMIN' | 'SUPER_ADMIN';
+  mustChangePassword?: boolean;
   isEmailVerified: boolean;
   createdAt: string;
 }
@@ -16,6 +17,17 @@ export const AdminUserManagementPage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('ALL');
   const [loading, setLoading] = useState(true);
+
+  // Modal State for Creating Staff / Admin / Student User
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [createName, setCreateName] = useState('');
+  const [createEmail, setCreateEmail] = useState('');
+  const [createRole, setCreateRole] = useState<'STUDENT' | 'OPERATOR' | 'ADMIN' | 'SUPER_ADMIN'>('OPERATOR');
+  const [createDept, setCreateDept] = useState('');
+  const [createPassword, setCreatePassword] = useState('TempPass@123');
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [createSuccess, setCreateSuccess] = useState<string | null>(null);
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -45,17 +57,9 @@ export const AdminUserManagementPage: React.FC = () => {
         },
         {
           id: 'u-3',
-          name: 'Operator Rajesh',
-          email: 'rajesh.op@campusprint.edu',
-          role: 'OPERATOR',
-          isEmailVerified: true,
-          createdAt: new Date(Date.now() - 172800000).toISOString(),
-        },
-        {
-          id: 'u-4',
           name: 'System Administrator',
           email: 'admin@campusprint.edu',
-          role: 'ADMIN',
+          role: 'SUPER_ADMIN',
           isEmailVerified: true,
           createdAt: new Date(Date.now() - 2592000000).toISOString(),
         },
@@ -69,12 +73,36 @@ export const AdminUserManagementPage: React.FC = () => {
     fetchUsers();
   }, []);
 
-  const handleUpdateRole = async (userId: string, newRole: string) => {
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCreateError(null);
+    setCreateSuccess(null);
+    setCreating(true);
+
     try {
-      await apiClient.patch(`/admin/users/${userId}`, { role: newRole });
+      await apiClient.post('/admin/users', {
+        name: createName,
+        email: createEmail,
+        role: createRole,
+        department: createDept || undefined,
+        password: createPassword,
+      });
+
+      setCreateSuccess(`Account created for ${createName} (${createRole})! User can log in with temporary credentials.`);
+      setCreateName('');
+      setCreateEmail('');
+      setCreateDept('');
+      setCreatePassword('TempPass@123');
       fetchUsers();
+      setTimeout(() => {
+        setIsModalOpen(false);
+        setCreateSuccess(null);
+      }, 2000);
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Failed to update user role');
+      const apiErr = err as { response?: { data?: { message?: string } } };
+      setCreateError(apiErr.response?.data?.message || 'Failed to create user account.');
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -96,19 +124,29 @@ export const AdminUserManagementPage: React.FC = () => {
   });
 
   return (
-    <div className="space-y-6 animate-fadeIn">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 animate-fadeIn relative">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">User Accounts Management</h1>
-          <p className="text-sm text-slate-500">Manage student, print operator, and admin permissions</p>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">User Accounts & Staff Provisioning</h1>
+          <p className="text-sm text-slate-500">Manage student directories and provision administrative staff accounts</p>
         </div>
 
-        <button
-          onClick={fetchUsers}
-          className="p-2.5 bg-surface-light dark:bg-surface-dark border border-slate-200 dark:border-slate-800 hover:bg-slate-50 rounded-xl transition-all"
-        >
-          <RefreshCw className={`w-4 h-4 text-slate-600 dark:text-slate-300 ${loading ? 'animate-spin' : ''}`} />
-        </button>
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center space-x-2 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-bold shadow-md transition-all"
+          >
+            <UserPlus className="w-4 h-4" />
+            <span>Create Staff / Admin Account</span>
+          </button>
+
+          <button
+            onClick={fetchUsers}
+            className="p-2.5 bg-surface-light dark:bg-surface-dark border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl transition-all"
+          >
+            <RefreshCw className={`w-4 h-4 text-slate-600 dark:text-slate-300 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
       </div>
 
       {/* Search & Role Filter Controls */}
@@ -125,7 +163,7 @@ export const AdminUserManagementPage: React.FC = () => {
         </div>
 
         <div className="flex space-x-1 bg-surface-light dark:bg-surface-dark border border-slate-200 dark:border-slate-800 p-1 rounded-xl">
-          {['ALL', 'STUDENT', 'OPERATOR', 'ADMIN'].map(role => (
+          {['ALL', 'STUDENT', 'ADMIN', 'SUPER_ADMIN'].map(role => (
             <button
               key={role}
               onClick={() => setRoleFilter(role)}
@@ -164,15 +202,17 @@ export const AdminUserManagementPage: React.FC = () => {
                   </td>
                   <td className="p-4">{user.email}</td>
                   <td className="p-4">
-                    <select
-                      value={user.role}
-                      onChange={e => handleUpdateRole(user.id, e.target.value)}
-                      className="px-2 py-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold focus:outline-none"
+                    <span
+                      className={`inline-block px-2.5 py-1 rounded-lg text-[11px] font-bold ${
+                        user.role === 'SUPER_ADMIN'
+                          ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300'
+                          : user.role === 'ADMIN'
+                          ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300'
+                          : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300'
+                      }`}
                     >
-                      <option value="STUDENT">STUDENT</option>
-                      <option value="OPERATOR">OPERATOR</option>
-                      <option value="ADMIN">ADMIN</option>
-                    </select>
+                      {user.role}
+                    </span>
                   </td>
                   <td className="p-4">
                     {user.isEmailVerified ? (
@@ -204,6 +244,128 @@ export const AdminUserManagementPage: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {/* Create Staff/Admin User Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-6 relative space-y-4">
+            <button
+              onClick={() => setIsModalOpen(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-white"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center space-x-2">
+              <div className="w-10 h-10 rounded-xl bg-primary-500/10 text-primary-600 flex items-center justify-center">
+                <UserPlus className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">Create Staff / Admin Account</h3>
+                <p className="text-xs text-slate-500">Students register themselves via public signup</p>
+              </div>
+            </div>
+
+            {createError && (
+              <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-600 dark:text-red-400 text-xs flex items-center space-x-2">
+                <ShieldAlert className="w-4 h-4 flex-shrink-0" />
+                <span>{createError}</span>
+              </div>
+            )}
+
+            {createSuccess && (
+              <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-600 dark:text-emerald-400 text-xs flex items-center space-x-2">
+                <CheckCircle className="w-4 h-4 flex-shrink-0" />
+                <span>{createSuccess}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleCreateUser} className="space-y-3 text-xs">
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Full Name</label>
+                <input
+                  type="text"
+                  value={createName}
+                  onChange={e => setCreateName(e.target.value)}
+                  placeholder="e.g. Administrator Ramesh"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Email Address</label>
+                <input
+                  type="email"
+                  value={createEmail}
+                  onChange={e => setCreateEmail(e.target.value)}
+                  placeholder="ramesh@campusprint.edu"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Role</label>
+                  <select
+                    value={createRole}
+                    onChange={e => setCreateRole(e.target.value as 'STUDENT' | 'OPERATOR' | 'ADMIN' | 'SUPER_ADMIN')}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-slate-900 dark:text-white focus:outline-none"
+                  >
+                    <option value="STUDENT">STUDENT</option>
+                    <option value="OPERATOR">OPERATOR (Print Desk Staff)</option>
+                    <option value="ADMIN">ADMIN</option>
+                    <option value="SUPER_ADMIN">SUPER_ADMIN</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Department</label>
+                  <input
+                    type="text"
+                    value={createDept}
+                    onChange={e => setCreateDept(e.target.value)}
+                    placeholder="IT Operations"
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Default Password</label>
+                <input
+                  type="text"
+                  value={createPassword}
+                  onChange={e => setCreatePassword(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-slate-900 dark:text-white focus:outline-none"
+                  required
+                />
+                <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1 flex items-center">
+                  <KeyRound className="w-3 h-3 mr-1" />
+                  User will be forced to change this password on their first login.
+                </p>
+              </div>
+
+              <div className="pt-2 flex justify-end space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl font-semibold hover:bg-slate-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={creating}
+                  className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold shadow-md disabled:opacity-50"
+                >
+                  {creating ? 'Creating...' : 'Create Account'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

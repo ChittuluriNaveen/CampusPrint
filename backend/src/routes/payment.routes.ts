@@ -1,6 +1,7 @@
 import { UserRole } from '@prisma/client';
 import { Router } from 'express';
 import {
+  adminGetPaymentStatsController,
   adminListPaymentsController,
   createPaymentController,
   getPaymentByIdController,
@@ -28,14 +29,13 @@ router.use(authenticate);
 router.post('/create', validateRequest(createPaymentSchema), createPaymentController);
 router.post('/verify', validateRequest(verifyPaymentSchema), verifyPaymentController);
 router.get('/history', getPaymentHistoryController);
-router.get('/:id', getPaymentByIdController);
-router.post('/retry', validateRequest(retryPaymentSchema), retryPaymentController);
-
-// Admin Payment Endpoints
+router.get('/admin/stats', authorize(UserRole.ADMIN, UserRole.SUPER_ADMIN), adminGetPaymentStatsController);
 router.get(
   '/admin/all',
   authorize(UserRole.ADMIN, UserRole.SUPER_ADMIN),
   adminListPaymentsController
 );
+router.get('/:id', getPaymentByIdController);
+router.post('/retry', validateRequest(retryPaymentSchema), retryPaymentController);
 
 export default router;

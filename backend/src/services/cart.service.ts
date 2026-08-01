@@ -176,10 +176,14 @@ export const addItemToCart = async (userId: string, input: AddToCartInput) => {
     throw new AppError(403, 'Access denied: You do not own this print order');
   }
 
-  if (order.status !== OrderStatus.DRAFT && order.status !== OrderStatus.PAYMENT_PENDING) {
+  if (
+    order.status !== OrderStatus.DRAFT &&
+    order.status !== OrderStatus.PAYMENT_PENDING &&
+    order.status !== OrderStatus.SUBMITTED
+  ) {
     throw new AppError(
       400,
-      `Cannot add order in status '${order.status}' to cart. Only DRAFT or PAYMENT_PENDING orders can be added.`
+      `Cannot add order in status '${order.status}' to cart. Only DRAFT, SUBMITTED, or PAYMENT_PENDING orders can be added.`
     );
   }
 
@@ -328,7 +332,11 @@ export const generateCheckoutPreview = async (
   let rawSubtotal = 0;
 
   for (const order of orders) {
-    if (order.status !== OrderStatus.DRAFT && order.status !== OrderStatus.PAYMENT_PENDING) {
+    if (
+      order.status !== OrderStatus.DRAFT &&
+      order.status !== OrderStatus.PAYMENT_PENDING &&
+      order.status !== OrderStatus.SUBMITTED
+    ) {
       throw new AppError(
         400,
         `Order ${order.orderNumber} in status '${order.status}' cannot be processed for checkout.`

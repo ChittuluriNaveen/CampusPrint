@@ -32,28 +32,50 @@ export const AdminAnalyticsReportsPage: React.FC = () => {
   const [period, setPeriod] = useState<string>('30days');
   const [reportType, setReportType] = useState<'revenue' | 'orders' | 'payments' | 'queue'>('revenue');
   const [kpis, setKpis] = useState<DashboardKPIs>({
-    totalRevenue: 18450,
-    averageOrderValue: 125,
-    totalOrders: 148,
-    completedOrders: 132,
-    totalUsers: 450,
-    totalDocuments: 890,
-    paymentSuccessRate: 98.4,
-    queuedPrintJobs: 4,
-    avgFulfillmentTimeMinutes: 14.5,
+    totalRevenue: 0,
+    averageOrderValue: 0,
+    totalOrders: 0,
+    completedOrders: 0,
+    totalUsers: 0,
+    totalDocuments: 0,
+    paymentSuccessRate: 100,
+    queuedPrintJobs: 0,
+    avgFulfillmentTimeMinutes: 12.5,
   });
+  const [revenueTrend, setRevenueTrend] = useState<Array<{ label: string; revenue: number; orders: number }>>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [exporting, setExporting] = useState<boolean>(false);
 
   const fetchAnalytics = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await apiClient.get(`/analytics/dashboard?period=${period}`);
-      if (response.data?.data?.kpis) {
-        setKpis(response.data.data.kpis);
+      const [dashRes, revRes] = await Promise.all([
+        apiClient.get(`/analytics/dashboard?period=${period}`),
+        apiClient.get(`/analytics/revenue?period=${period}`),
+      ]);
+
+      if (dashRes.data?.data?.kpis) {
+        setKpis(dashRes.data.data.kpis);
+      }
+
+      if (revRes.data?.data?.trend && Array.isArray(revRes.data.data.trend)) {
+        const mappedTrend = revRes.data.data.trend.map((t: { date: string; revenue: number; count: number }) => {
+          const dateObj = new Date(t.date);
+          const dayLabel = isNaN(dateObj.getTime())
+            ? t.date
+            : dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+          return {
+            label: dayLabel,
+            revenue: t.revenue || 0,
+            orders: t.count || 0,
+          };
+        });
+        setRevenueTrend(mappedTrend);
+      } else {
+        setRevenueTrend([]);
       }
     } catch {
-      // Retain fallback KPI state for offline preview
+      console.warn('Unable to load live analytics; displaying default metrics');
     } finally {
       setLoading(false);
     }
@@ -78,7 +100,6 @@ export const AdminAnalyticsReportsPage: React.FC = () => {
       a.click();
       a.remove();
     } catch {
-      // Frontend CSV fallback generation
       const csvContent = `data:text/csv;charset=utf-8,Report Type,Period,Generated At\n${reportType},${period},${new Date().toISOString()}`;
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement('a');
@@ -92,18 +113,19 @@ export const AdminAnalyticsReportsPage: React.FC = () => {
     }
   };
 
-  // Sample trend bars for visualization
-  const trendData = [
-    { label: 'Mon', revenue: 2400, orders: 18 },
-    { label: 'Tue', revenue: 3100, orders: 24 },
-    { label: 'Wed', revenue: 2800, orders: 21 },
-    { label: 'Thu', revenue: 3900, orders: 30 },
-    { label: 'Fri', revenue: 4200, orders: 35 },
-    { label: 'Sat', revenue: 1200, orders: 10 },
-    { label: 'Sun', revenue: 850, orders: 8 },
-  ];
+  const trendData = revenueTrend.length > 0
+    ? revenueTrend
+    : [
+        { label: 'Mon', revenue: 0, orders: 0 },
+        { label: 'Tue', revenue: 0, orders: 0 },
+        { label: 'Wed', revenue: 0, orders: 0 },
+        { label: 'Thu', revenue: 0, orders: 0 },
+        { label: 'Fri', revenue: 0, orders: 0 },
+      ];
 
-  const maxRevenue = Math.max(...trendData.map(t => t.revenue));
+  const maxRevenue = Math.max(...trendData.map(t => t.revenue), 1);
+  const peakRevenue = Math.max(...trendData.map(t => t.revenue), 0);
+  const completionRate = kpis.totalOrders > 0 ? ((kpis.completedOrders / kpis.totalOrders) * 100).toFixed(1) : '100';
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 animate-fadeIn">
@@ -251,35 +273,46 @@ export const AdminAnalyticsReportsPage: React.FC = () => {
             </div>
 
             <Badge variant="primary" className="text-xs font-semibold">
-              Peak: ₹4,200.00
+              Peak: ₹{peakRevenue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
             </Badge>
           </CardHeader>
 
           <CardContent className="p-6">
-            <div className="h-64 flex items-end space-x-4 pt-6 pb-2 border-b border-slate-100 dark:border-slate-800">
-              {trendData.map((t, idx) => {
-                const heightPercent = (t.revenue / maxRevenue) * 100;
-                return (
-                  <div key={idx} className="flex-1 flex flex-col items-center group relative">
-                    {/* Tooltip */}
-                    <div className="absolute -top-10 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 text-white text-[11px] font-bold px-2 py-1 rounded shadow-lg pointer-events-none whitespace-nowrap z-10">
-                      ₹{t.revenue.toLocaleString()} ({t.orders} orders)
+            <div className="overflow-x-auto w-full pb-2 select-none cursor-grab active:cursor-grabbing">
+              <div className="h-64 flex items-end space-x-3 pt-10 pb-2 border-b border-slate-100 dark:border-slate-800 min-w-max">
+                {trendData.map((t, idx) => {
+                  const heightPercent = maxRevenue > 0 && t.revenue > 0 ? (t.revenue / maxRevenue) * 100 : 0;
+                  const displayHeight = t.revenue > 0 ? Math.min(Math.max(heightPercent, 18), 72) : 10;
+                  return (
+                    <div key={idx} className="w-[52px] flex-shrink-0 flex flex-col items-center group relative h-full justify-end">
+                      {/* Tooltip */}
+                      <div className="absolute -top-9 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 text-white text-[11px] font-bold px-2 py-1 rounded shadow-lg pointer-events-none whitespace-nowrap z-20">
+                        ₹{t.revenue.toLocaleString()} ({t.orders} orders)
+                      </div>
+                      {/* Value Badge above bar */}
+                      <span className="text-[10px] font-extrabold text-indigo-600 dark:text-cyan-300 mb-1 z-10">
+                        {t.revenue > 0 ? `₹${t.revenue}` : '₹0'}
+                      </span>
+                      {/* Bar */}
+                      <div
+                        style={{ height: `${displayHeight}%` }}
+                        className={`w-full max-w-[36px] rounded-t-xl transition-all shadow-md ${
+                          t.revenue > 0
+                            ? 'bg-gradient-to-t from-indigo-600 via-blue-500 to-emerald-400 dark:from-indigo-500 dark:via-cyan-400 dark:to-emerald-300 shadow-indigo-500/30 group-hover:brightness-110'
+                            : 'bg-slate-300/80 dark:bg-slate-700/90 border border-slate-300 dark:border-slate-600/80 group-hover:bg-slate-400 dark:group-hover:bg-slate-600'
+                        }`}
+                      />
+                      <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200 mt-2 truncate max-w-[50px] text-center z-10">
+                        {t.label}
+                      </span>
                     </div>
-                    {/* Bar */}
-                    <div
-                      style={{ height: `${heightPercent}%` }}
-                      className="w-full max-w-[42px] bg-gradient-to-t from-primary-700 to-primary-500 rounded-t-xl group-hover:from-primary-600 group-hover:to-primary-400 transition-all shadow-md"
-                    />
-                    <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-2">
-                      {t.label}
-                    </span>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
             <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 pt-4">
-              <span>Average Daily Volume: ₹2,578.57</span>
-              <span>Total Orders Processed: 160</span>
+              <span>Total Revenue: ₹{kpis.totalRevenue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+              <span>Total Orders: {kpis.totalOrders}</span>
             </div>
           </CardContent>
         </Card>
@@ -296,10 +329,10 @@ export const AdminAnalyticsReportsPage: React.FC = () => {
             <div>
               <div className="flex justify-between text-xs font-semibold mb-1.5">
                 <span className="text-slate-600 dark:text-slate-400">Order Completion Rate</span>
-                <span className="text-emerald-600 font-bold">89.2%</span>
+                <span className="text-emerald-600 font-bold">{completionRate}%</span>
               </div>
               <div className="w-full h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                <div className="h-full bg-emerald-500 rounded-full" style={{ width: '89.2%' }} />
+                <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${completionRate}%` }} />
               </div>
             </div>
 

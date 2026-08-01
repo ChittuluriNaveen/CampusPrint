@@ -19,6 +19,7 @@ export interface AuthenticatedUser {
   year?: number | null;
   phone?: string | null;
   avatar?: string | null;
+  mustChangePassword?: boolean;
   isVerified: boolean;
   status: UserStatus;
   createdAt: Date;

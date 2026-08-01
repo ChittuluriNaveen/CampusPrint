@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import { AppError } from '../services/auth.service';
 import {
+  adminGetPaymentStats,
+  adminListPayments,
   createPaymentSession,
   getPaymentById,
   getPaymentHistory,
@@ -117,13 +119,38 @@ export const adminListPaymentsController = async (req: Request, res: Response): 
       sendError(res, 401, 'Authentication required');
       return;
     }
-    const history = await getPaymentHistory(req.user.id, req.user.role);
-    sendSuccess(res, 200, 'Admin payments list retrieved successfully', history);
+    const result = await adminListPayments({
+      search: req.query.search as string,
+      status: req.query.status as string,
+      page: req.query.page ? parseInt(req.query.page as string, 10) : 1,
+      limit: req.query.limit ? parseInt(req.query.limit as string, 10) : 20,
+    });
+    sendSuccess(res, 200, 'Admin payments list retrieved successfully', result);
   } catch (error) {
     if (error instanceof AppError) {
       sendError(res, error.statusCode, error.message);
       return;
     }
     sendError(res, 500, 'Failed to retrieve payments list');
+  }
+};
+
+export const adminGetPaymentStatsController = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    if (!req.user) {
+      sendError(res, 401, 'Authentication required');
+      return;
+    }
+    const stats = await adminGetPaymentStats();
+    sendSuccess(res, 200, 'Payment statistics retrieved successfully', stats);
+  } catch (error) {
+    if (error instanceof AppError) {
+      sendError(res, error.statusCode, error.message);
+      return;
+    }
+    sendError(res, 500, 'Failed to retrieve payment statistics');
   }
 };

@@ -30,35 +30,35 @@ router.get('/:id', getPrintJobByIdController);
 // Protected Admin / Operator Endpoints
 router.post(
   '/',
-  authorize(UserRole.ADMIN, UserRole.SUPER_ADMIN),
+  authorize(UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.OPERATOR),
   validateRequest(createPrintJobSchema),
   createPrintJobController
 );
 
 router.patch(
   '/:id/status',
-  authorize(UserRole.ADMIN, UserRole.SUPER_ADMIN),
+  authorize(UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.OPERATOR),
   validateRequest(updatePrintJobStatusSchema),
   updatePrintJobStatusController
 );
 
 router.patch(
   '/:id/assign',
-  authorize(UserRole.ADMIN, UserRole.SUPER_ADMIN),
+  authorize(UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.OPERATOR),
   validateRequest(assignOperatorSchema),
   assignOperatorController
 );
 
 router.patch(
   '/:id/priority',
-  authorize(UserRole.ADMIN, UserRole.SUPER_ADMIN),
+  authorize(UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.OPERATOR),
   validateRequest(updatePrioritySchema),
   updatePriorityController
 );
 
 router.delete(
   '/:id',
-  authorize(UserRole.ADMIN, UserRole.SUPER_ADMIN),
+  authorize(UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.OPERATOR),
   cancelPrintJobController
 );
 

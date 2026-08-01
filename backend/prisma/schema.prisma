@@ -16,6 +16,7 @@ datasource db {
 
 enum UserRole {
   STUDENT
+  OPERATOR
   ADMIN
   SUPER_ADMIN
 }
@@ -28,15 +29,27 @@ enum UserStatus {
 
 enum OrderStatus {
   DRAFT
+  SUBMITTED
+  PENDING_REVIEW
+  ACCEPTED
   PAYMENT_PENDING
   PAID
   QUEUED
   PRINTING
   QUALITY_CHECK
   READY
+  READY_FOR_PICKUP
   COLLECTED
+  COMPLETED
+  REJECTED
   CANCELLED
   REFUNDED
+}
+
+enum PaymentMethod {
+  ONLINE_RAZORPAY
+  COUNTER_CASH
+  COUNTER_UPI
 }
 
 enum PaymentStatus {
@@ -85,6 +98,7 @@ model User {
   year         Int?
   phone        String?
   avatar       String?
+  mustChangePassword Boolean @default(false)
   isVerified   Boolean    @default(false)
   status       UserStatus @default(ACTIVE)
   createdAt    DateTime   @default(now())
@@ -95,8 +109,12 @@ model User {
   documents    Document[]
   notifications Notification[]
   activityLogs ActivityLog[]
+  payments     Payment[]
   cart         Cart?
   assignedJobs PrintJob[]   @relation("OperatorJobs")
+  inventoryTransactions InventoryTransaction[]
+  printerAssignments PrinterAssignment[]
+  queueHistories     QueueHistory[]
 
   @@index([email])
   @@index([studentId])
@@ -126,17 +144,29 @@ model Document {
 }
 
 model Order {
-  id                  String      @id @default(uuid())
-  orderNumber         String      @unique
+  id                  String         @id @default(uuid())
+  orderNumber         String         @unique
   userId              String
-  status              OrderStatus @default(DRAFT)
+  status              OrderStatus    @default(DRAFT)
+  paymentMethod       PaymentMethod  @default(ONLINE_RAZORPAY)
   subtotal            Float
-  tax                 Float       @default(0)
+  tax                 Float          @default(0)
   total               Float
+  estimatedPrice      Float?
+  finalPrice          Float?
+  priceAdjusted       Boolean        @default(false)
+  priceAdjustmentReason String?
+  rejectedReason      String?
+  pickupCode                 String?
+  pickupCodeGeneratedAt      DateTime?
+  pickupVerifiedAt           DateTime?
+  pickupVerifiedBy           String?
+  pickupVerificationAttempts Int       @default(0)
+  pickupVerificationMethod   String?   @default("MANUAL_CODE")
   estimatedCompletion DateTime?
   remarks             String?
-  createdAt           DateTime    @default(now())
-  updatedAt           DateTime    @updatedAt
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
   deletedAt           DateTime?
 
   user                User        @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -144,10 +174,13 @@ model Order {
   payment             Payment?
   cartItems           CartItem[]
   printJob            PrintJob?
+  inventoryDeductions InventoryTransaction[]
+  printQueue          PrintQueue?
 
   @@index([orderNumber])
   @@index([userId])
   @@index([status])
+  @@index([pickupCode])
   @@index([createdAt])
   @@map("orders")
 }
@@ -210,24 +243,34 @@ model CartItem {
 }
 
 model Payment {
-  id                String        @id @default(uuid())
-  orderId           String        @unique
-  razorpayOrderId   String?
-  razorpayPaymentId String?       @unique
-  razorpaySignature String?
-  amount            Float
-  currency          String        @default("INR")
-  paymentMethod     String?
-  paymentStatus     PaymentStatus @default(CREATED)
-  paidAt            DateTime?
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
+  id                   String        @id @default(uuid())
+  orderId              String        @unique
+  userId               String?
+  gateway              String        @default("RAZORPAY")
+  razorpayOrderId      String?
+  razorpayPaymentId    String?       @unique
+  razorpaySignature    String?
+  transactionReference String?       @unique
+  amount               Float
+  currency             String        @default("INR")
+  paymentMethod        String?
+  paymentStatus        PaymentStatus @default(CREATED)
+  verifiedAt           DateTime?
+  verificationStatus   String        @default("PENDING")
+  refundStatus         String        @default("NONE")
+  paidAt               DateTime?
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
 
-  order             Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order                Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user                 User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([orderId])
+  @@index([userId])
   @@index([razorpayPaymentId])
+  @@index([transactionReference])
   @@index([paymentStatus])
+  @@index([createdAt])
   @@map("payments")
 }
 
@@ -247,6 +290,7 @@ model PrintJob {
 
   order         Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
   operator      User?       @relation("OperatorJobs", fields: [operatorId], references: [id], onDelete: SetNull)
+  printQueue    PrintQueue?
 
   @@index([jobNumber])
   @@index([orderId])
@@ -321,4 +365,234 @@ model Setting {
 
   @@index([key])
   @@map("settings")
+}
+
+// -----------------------------------------------------------------------------
+// Inventory & Consumables Models (EP-04)
+// -----------------------------------------------------------------------------
+
+enum InventoryCategory {
+  PAPER
+  INK_TONER
+  BINDING
+  LAMINATION
+  CONSUMABLE
+  OTHER
+}
+
+enum StockTransactionType {
+  STOCK_IN
+  STOCK_OUT
+  AUTO_DEDUCTION
+  MANUAL_ADJUSTMENT
+  DAMAGE_LOSS
+}
+
+enum InventoryItemStatus {
+  IN_STOCK
+  LOW_STOCK
+  OUT_OF_STOCK
+}
+
+model Supplier {
+  id            String          @id @default(uuid())
+  name          String
+  contactPerson String?
+  phone         String?
+  email         String?
+  address       String?
+  status        String          @default("ACTIVE")
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  items         InventoryItem[]
+
+  @@map("suppliers")
+}
+
+model InventoryItem {
+  id              String               @id @default(uuid())
+  name            String
+  sku             String?              @unique
+  category        InventoryCategory
+  unit            String               @default("SHEETS")
+  currentQuantity Float                @default(0)
+  minQuantity     Float                @default(50)
+  maxQuantity     Float                @default(1000)
+  purchasePrice   Float                @default(0)
+  sellingPrice    Float?
+  status          InventoryItemStatus  @default(IN_STOCK)
+  location        String?
+  supplierId      String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  supplier        Supplier?            @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  transactions    InventoryTransaction[]
+
+  @@index([category])
+  @@index([status])
+  @@map("inventory_items")
+}
+
+model InventoryTransaction {
+  id              String               @id @default(uuid())
+  inventoryItemId String
+  type            StockTransactionType
+  quantity        Float
+  previousStock   Float
+  newStock        Float
+  reason          String
+  performedById   String?
+  orderId         String?
+  createdAt       DateTime             @default(now())
+
+  item            InventoryItem        @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  performedBy     User?                @relation(fields: [performedById], references: [id], onDelete: SetNull)
+  order           Order?               @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([inventoryItemId])
+  @@index([type])
+  @@index([createdAt])
+  @@map("inventory_transactions")
+}
+
+enum PrinterStatus {
+  ONLINE
+  OFFLINE
+  BUSY
+  PRINTING
+  IDLE
+  MAINTENANCE
+  ERROR
+}
+
+enum QueuePriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum QueueStatus {
+  QUEUED
+  ASSIGNED
+  PRINTING
+  PAUSED
+  COMPLETED
+  CANCELLED
+  FAILED
+}
+
+model Printer {
+  id                  String              @id @default(uuid())
+  name                String
+  code                String              @unique
+  printerType         String              @default("LASER")
+  manufacturer        String              @default("HP")
+  model               String              @default("LaserJet Pro")
+  supportedPaperSizes String[]            @default(["A4"])
+  supportedColorModes String[]            @default(["BW"])
+  supportedDuplex     Boolean             @default(true)
+  status              PrinterStatus       @default(ONLINE)
+  location            String?
+  maxDailyCapacity    Int                 @default(2000)
+  currentDailyCount   Int                 @default(0)
+  isMaintenanceMode   Boolean             @default(false)
+  active              Boolean             @default(true)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  queueItems          PrintQueue[]
+  assignments         PrinterAssignment[]
+  statistics          PrinterStatistics[]
+
+  @@index([status])
+  @@index([code])
+  @@map("printers")
+}
+
+model PrintQueue {
+  id                      String              @id @default(uuid())
+  orderId                 String              @unique
+  printJobId              String?             @unique
+  assignedPrinterId       String?
+  queuePosition           Int                 @default(1)
+  priority                QueuePriority       @default(NORMAL)
+  status                  QueueStatus         @default(QUEUED)
+  estimatedStartTime      DateTime?
+  estimatedCompletionTime DateTime?
+  paused                  Boolean             @default(false)
+  pauseReason             String?
+  createdAt               DateTime            @default(now())
+  updatedAt               DateTime            @updatedAt
+
+  order                   Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  printJob                PrintJob?           @relation(fields: [printJobId], references: [id], onDelete: SetNull)
+  assignedPrinter         Printer?            @relation(fields: [assignedPrinterId], references: [id], onDelete: SetNull)
+  assignments             PrinterAssignment[]
+  history                 QueueHistory[]
+
+  @@index([orderId])
+  @@index([assignedPrinterId])
+  @@index([status])
+  @@index([priority, queuePosition])
+  @@map("print_queues")
+}
+
+model PrinterAssignment {
+  id              String      @id @default(uuid())
+  queueId         String
+  printerId       String
+  assignedById    String?
+  isAutoAssigned  Boolean     @default(true)
+  overrideReason  String?
+  assignedAt      DateTime    @default(now())
+
+  queue           PrintQueue  @relation(fields: [queueId], references: [id], onDelete: Cascade)
+  printer         Printer     @relation(fields: [printerId], references: [id], onDelete: Cascade)
+  assignedBy      User?       @relation(fields: [assignedById], references: [id], onDelete: SetNull)
+
+  @@index([queueId])
+  @@index([printerId])
+  @@map("printer_assignments")
+}
+
+model PrinterStatistics {
+  id              String      @id @default(uuid())
+  printerId       String
+  date            DateTime
+  jobsPrinted     Int         @default(0)
+  pagesPrinted    Int         @default(0)
+  colorPages      Int         @default(0)
+  bwPages         Int         @default(0)
+  downtimeMinutes Int         @default(0)
+  errorCount      Int         @default(0)
+  createdAt       DateTime    @default(now())
+
+  printer         Printer     @relation(fields: [printerId], references: [id], onDelete: Cascade)
+
+  @@unique([printerId, date])
+  @@index([printerId])
+  @@index([date])
+  @@map("printer_statistics")
+}
+
+model QueueHistory {
+  id               String         @id @default(uuid())
+  queueId          String
+  previousStatus   QueueStatus?
+  newStatus        QueueStatus
+  previousPriority QueuePriority?
+  newPriority      QueuePriority?
+  notes            String?
+  performedById    String?
+  createdAt        DateTime       @default(now())
+
+  queue            PrintQueue     @relation(fields: [queueId], references: [id], onDelete: Cascade)
+  performedBy      User?          @relation(fields: [performedById], references: [id], onDelete: SetNull)
+
+  @@index([queueId])
+  @@index([createdAt])
+  @@map("queue_histories")
 }

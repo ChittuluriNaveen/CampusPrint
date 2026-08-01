@@ -34,17 +34,39 @@ export const getDashboardAnalytics = async (query: AnalyticsQueryInput) => {
       totalOrders,
       completedOrders,
       totalRevenueAgg,
+      orderRevenueAgg,
       totalUsers,
       totalDocuments,
       successfulPayments,
       failedPayments,
       queuedPrintJobs,
     ] = await Promise.all([
-      prisma.order.count({ where: { createdAt: dateRange } }),
-      prisma.order.count({ where: { status: OrderStatus.COLLECTED, createdAt: dateRange } }),
+      prisma.order.count({ where: { status: { not: OrderStatus.DRAFT }, createdAt: dateRange } }),
+      prisma.order.count({ where: { status: { in: [OrderStatus.COLLECTED, OrderStatus.COMPLETED] }, createdAt: dateRange } }),
       prisma.payment.aggregate({
         _sum: { amount: true },
         where: { paymentStatus: PaymentStatus.SUCCESS, createdAt: dateRange },
+      }),
+      prisma.order.aggregate({
+        _sum: { total: true },
+        where: {
+          status: {
+            in: [
+              OrderStatus.SUBMITTED,
+              OrderStatus.ACCEPTED,
+              OrderStatus.PAID,
+              OrderStatus.QUEUED,
+              OrderStatus.PRINTING,
+              OrderStatus.QUALITY_CHECK,
+              OrderStatus.READY,
+              OrderStatus.READY_FOR_PICKUP,
+              OrderStatus.COLLECTED,
+              OrderStatus.COMPLETED,
+            ],
+          },
+          payment: null,
+          createdAt: dateRange,
+        },
       }),
       prisma.user.count(),
       prisma.document.count({ where: { createdAt: dateRange } }),
@@ -53,7 +75,7 @@ export const getDashboardAnalytics = async (query: AnalyticsQueryInput) => {
       prisma.printJob.count({ where: { status: OrderStatus.QUEUED } }),
     ]);
 
-    const totalRevenue = totalRevenueAgg._sum?.amount || 0;
+    const totalRevenue = (totalRevenueAgg._sum?.amount || 0) + (orderRevenueAgg._sum?.total || 0);
     const averageOrderValue = totalOrders > 0 ? Number((totalRevenue / totalOrders).toFixed(2)) : 0;
     const totalPaymentsAttempted = successfulPayments + failedPayments;
     const paymentSuccessRate =
@@ -96,6 +118,17 @@ export const getDashboardAnalytics = async (query: AnalyticsQueryInput) => {
 export const getRevenueAnalytics = async (query: AnalyticsQueryInput) => {
   try {
     const dateRange = getDateFilter(query);
+    const numDays = query.period === 'today' ? 1 : query.period === '7days' ? 7 : query.period === 'yearly' ? 365 : 30;
+    const revenueByDay: Record<string, { date: string; revenue: number; count: number }> = {};
+
+    const now = new Date();
+    for (let i = numDays - 1; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(now.getDate() - i);
+      const dayKey = d.toISOString().split('T')[0];
+      revenueByDay[dayKey] = { date: dayKey, revenue: 0, count: 0 };
+    }
+
     const payments = await prisma.payment.findMany({
       where: {
         paymentStatus: PaymentStatus.SUCCESS,
@@ -108,8 +141,6 @@ export const getRevenueAnalytics = async (query: AnalyticsQueryInput) => {
       orderBy: { createdAt: 'asc' },
     });
 
-    const revenueByDay: Record<string, { date: string; revenue: number; count: number }> = {};
-
     payments.forEach(p => {
       const dayKey = new Date(p.createdAt).toISOString().split('T')[0];
       if (!revenueByDay[dayKey]) {
@@ -119,11 +150,46 @@ export const getRevenueAnalytics = async (query: AnalyticsQueryInput) => {
       revenueByDay[dayKey].count += 1;
     });
 
+    const orders = await prisma.order.findMany({
+      where: {
+        status: {
+          in: [
+            OrderStatus.SUBMITTED,
+            OrderStatus.ACCEPTED,
+            OrderStatus.PAID,
+            OrderStatus.QUEUED,
+            OrderStatus.PRINTING,
+            OrderStatus.QUALITY_CHECK,
+            OrderStatus.READY,
+            OrderStatus.READY_FOR_PICKUP,
+            OrderStatus.COLLECTED,
+            OrderStatus.COMPLETED,
+          ],
+        },
+        payment: null,
+        createdAt: dateRange,
+      },
+      select: {
+        total: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    orders.forEach(o => {
+      const dayKey = new Date(o.createdAt).toISOString().split('T')[0];
+      if (!revenueByDay[dayKey]) {
+        revenueByDay[dayKey] = { date: dayKey, revenue: 0, count: 0 };
+      }
+      revenueByDay[dayKey].revenue += o.total;
+      revenueByDay[dayKey].count += 1;
+    });
+
     const trend = Object.values(revenueByDay);
 
     return {
-      totalRevenue: payments.reduce((sum, p) => sum + p.amount, 0),
-      totalTransactions: payments.length,
+      totalRevenue: trend.reduce((sum, item) => sum + item.revenue, 0),
+      totalTransactions: trend.reduce((sum, item) => sum + item.count, 0),
       trend,
     };
   } catch (error) {

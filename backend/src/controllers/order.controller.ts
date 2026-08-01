@@ -1,11 +1,18 @@
 import { Request, Response } from 'express';
 import { AppError } from '../services/auth.service';
 import {
+  adjustOrderPrice,
   cancelOrder,
   createOrder,
+  ensurePickupCode,
   getOrderById,
+  getPickupCodeForOrder,
   getUserOrders,
+  recordCounterPayment,
+  reviewPrintRequest,
+  submitPrintRequest,
   updateOrder,
+  verifyPickupCodeForOrder,
 } from '../services/order.service';
 import { sendError, sendSuccess } from '../utils/response';
 import { OrderQueryInput } from '../validators/order.validator';
@@ -24,6 +31,78 @@ export const createOrderController = async (req: Request, res: Response): Promis
       return;
     }
     sendError(res, 500, 'Failed to create print order');
+  }
+};
+
+export const submitRequestController = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      sendError(res, 401, 'Authentication required');
+      return;
+    }
+    const { id } = req.params;
+    const order = await submitPrintRequest(id, req.user.id);
+    sendSuccess(res, 200, 'Print request submitted successfully', order);
+  } catch (error) {
+    if (error instanceof AppError) {
+      sendError(res, error.statusCode, error.message);
+      return;
+    }
+    sendError(res, 500, 'Failed to submit print request');
+  }
+};
+
+export const reviewRequestController = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      sendError(res, 401, 'Authentication required');
+      return;
+    }
+    const { id } = req.params;
+    const updated = await reviewPrintRequest(id, req.user.id, req.body);
+    sendSuccess(res, 200, 'Print request reviewed successfully', updated);
+  } catch (error) {
+    if (error instanceof AppError) {
+      sendError(res, error.statusCode, error.message);
+      return;
+    }
+    sendError(res, 500, 'Failed to review print request');
+  }
+};
+
+export const adjustPriceController = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      sendError(res, 401, 'Authentication required');
+      return;
+    }
+    const { id } = req.params;
+    const updated = await adjustOrderPrice(id, req.user.id, req.body);
+    sendSuccess(res, 200, 'Print request price updated successfully', updated);
+  } catch (error) {
+    if (error instanceof AppError) {
+      sendError(res, error.statusCode, error.message);
+      return;
+    }
+    sendError(res, 500, 'Failed to update price');
+  }
+};
+
+export const recordCounterPaymentController = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      sendError(res, 401, 'Authentication required');
+      return;
+    }
+    const { id } = req.params;
+    const updated = await recordCounterPayment(id, req.user.id, req.body);
+    sendSuccess(res, 200, 'Counter payment recorded successfully', updated);
+  } catch (error) {
+    if (error instanceof AppError) {
+      sendError(res, error.statusCode, error.message);
+      return;
+    }
+    sendError(res, 500, 'Failed to record counter payment');
   }
 };
 
@@ -97,5 +176,59 @@ export const cancelOrderController = async (req: Request, res: Response): Promis
       return;
     }
     sendError(res, 500, 'Failed to cancel print order');
+  }
+};
+
+export const getPickupCodeController = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      sendError(res, 401, 'Authentication required');
+      return;
+    }
+    const { id } = req.params;
+    const pickupInfo = await getPickupCodeForOrder(id, req.user.id, req.user.role);
+    sendSuccess(res, 200, 'Pickup code retrieved successfully', pickupInfo);
+  } catch (error) {
+    if (error instanceof AppError) {
+      sendError(res, error.statusCode, error.message);
+      return;
+    }
+    sendError(res, 500, 'Failed to retrieve pickup code');
+  }
+};
+
+export const generatePickupCodeController = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      sendError(res, 401, 'Authentication required');
+      return;
+    }
+    const { id } = req.params;
+    const pickupCode = await ensurePickupCode(id);
+    sendSuccess(res, 200, 'Pickup code generated successfully', { pickupCode });
+  } catch (error) {
+    if (error instanceof AppError) {
+      sendError(res, error.statusCode, error.message);
+      return;
+    }
+    sendError(res, 500, 'Failed to generate pickup code');
+  }
+};
+
+export const verifyPickupController = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      sendError(res, 401, 'Authentication required');
+      return;
+    }
+    const { id } = req.params;
+    const updatedOrder = await verifyPickupCodeForOrder(id, req.user.id, req.body);
+    sendSuccess(res, 200, 'Pickup verification successful. Order completed!', updatedOrder);
+  } catch (error) {
+    if (error instanceof AppError) {
+      sendError(res, error.statusCode, error.message);
+      return;
+    }
+    sendError(res, 500, 'Failed to verify pickup code');
   }
 };

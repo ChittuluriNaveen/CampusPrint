@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma';
 import { AppError } from '../services/auth.service';
 import { createNotification } from './notification.service';
 import { generateJobNumber } from '../utils/jobNumber';
+import { ensurePickupCode } from './order.service';
 import {
   AssignOperatorInput,
   CreatePrintJobInput,
@@ -13,13 +14,19 @@ import {
 
 const ALLOWED_JOB_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   DRAFT: [],
+  SUBMITTED: [],
+  PENDING_REVIEW: [],
+  ACCEPTED: [],
   PAYMENT_PENDING: [],
   PAID: [OrderStatus.QUEUED],
   QUEUED: [OrderStatus.PRINTING, OrderStatus.CANCELLED],
-  PRINTING: [OrderStatus.QUALITY_CHECK, OrderStatus.CANCELLED],
-  QUALITY_CHECK: [OrderStatus.READY, OrderStatus.PRINTING, OrderStatus.CANCELLED],
-  READY: [OrderStatus.COLLECTED, OrderStatus.CANCELLED],
-  COLLECTED: [],
+  PRINTING: [OrderStatus.QUALITY_CHECK, OrderStatus.READY, OrderStatus.READY_FOR_PICKUP, OrderStatus.CANCELLED],
+  QUALITY_CHECK: [OrderStatus.READY, OrderStatus.READY_FOR_PICKUP, OrderStatus.PRINTING, OrderStatus.CANCELLED],
+  READY: [OrderStatus.READY_FOR_PICKUP, OrderStatus.COLLECTED, OrderStatus.COMPLETED, OrderStatus.CANCELLED],
+  READY_FOR_PICKUP: [OrderStatus.COLLECTED, OrderStatus.COMPLETED, OrderStatus.CANCELLED],
+  COLLECTED: [OrderStatus.COMPLETED],
+  COMPLETED: [],
+  REJECTED: [],
   CANCELLED: [],
   REFUNDED: [],
 };
@@ -101,6 +108,36 @@ export const getPrintQueue = async (query: PrintJobQueryInput) => {
   const page = Math.max(1, query.page || 1);
   const limit = Math.min(100, Math.max(1, query.limit || 10));
   const skip = (page - 1) * limit;
+
+  // Auto-sync active orders into PrintJob table if missing
+  try {
+    const unqueuedOrders = await prisma.order.findMany({
+      where: {
+        status: { in: [OrderStatus.PAID, OrderStatus.QUEUED, OrderStatus.PRINTING, OrderStatus.ACCEPTED] },
+        deletedAt: null,
+        printJob: null,
+      },
+    });
+
+    for (const order of unqueuedOrders) {
+      const maxJob = await prisma.printJob.findFirst({
+        orderBy: { queuePosition: 'desc' },
+        select: { queuePosition: true },
+      });
+      const nextPos = (maxJob?.queuePosition || 0) + 1;
+      await prisma.printJob.create({
+        data: {
+          jobNumber: generateJobNumber(),
+          orderId: order.id,
+          priority: 1,
+          queuePosition: nextPos,
+          status: order.status === OrderStatus.PRINTING ? OrderStatus.PRINTING : OrderStatus.QUEUED,
+        },
+      });
+    }
+  } catch (err) {
+    console.warn('Auto-sync print queue error:', err);
+  }
 
   const whereClause: Prisma.PrintJobWhereInput = {
     ...(query.status && { status: query.status }),
@@ -234,29 +271,31 @@ export const updatePrintJobStatus = async (
     return updated;
   });
 
-  // Trigger Notification for Order Status Advancement
+  // Trigger Notification & Pickup Code Generation
   try {
-    if (input.status === OrderStatus.PRINTING) {
-      await createNotification(
-        updatedJob.order.userId,
-        'Printing Started',
-        `Your print job ${updatedJob.jobNumber} for Order ${updatedJob.order.orderNumber} is now printing.`,
-        NotificationType.INFO
-      );
-    } else if (input.status === OrderStatus.READY) {
-      await createNotification(
-        updatedJob.order.userId,
-        'Order Ready for Pickup',
-        `Your print job ${updatedJob.jobNumber} for Order ${updatedJob.order.orderNumber} is completed and ready for collection!`,
-        NotificationType.SUCCESS
-      );
+    if (input.status === OrderStatus.READY_FOR_PICKUP || input.status === OrderStatus.READY) {
+      const code = await ensurePickupCode(job.orderId);
+      const codeNotice = code ? ` Your pickup passcode is: ${code}` : '';
+      await createNotification({
+        userId: updatedJob.order.userId,
+        title: 'Order Ready for Pickup',
+        message: `Your print job ${updatedJob.jobNumber} for Order ${updatedJob.order.orderNumber} is completed and ready for counter collection!${codeNotice}`,
+        type: NotificationType.SUCCESS,
+      });
+    } else if (input.status === OrderStatus.PRINTING) {
+      await createNotification({
+        userId: updatedJob.order.userId,
+        title: 'Printing Started',
+        message: `Your print job ${updatedJob.jobNumber} for Order ${updatedJob.order.orderNumber} is now printing.`,
+        type: NotificationType.INFO,
+      });
     } else if (input.status === OrderStatus.CANCELLED) {
-      await createNotification(
-        updatedJob.order.userId,
-        'Print Job Cancelled',
-        `Your print job ${updatedJob.jobNumber} for Order ${updatedJob.order.orderNumber} was cancelled.`,
-        NotificationType.WARNING
-      );
+      await createNotification({
+        userId: updatedJob.order.userId,
+        title: 'Print Job Cancelled',
+        message: `Your print job ${updatedJob.jobNumber} for Order ${updatedJob.order.orderNumber} was cancelled.`,
+        type: NotificationType.WARNING,
+      });
     }
   } catch (err) {
     // Notification error fallback

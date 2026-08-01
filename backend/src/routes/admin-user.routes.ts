@@ -6,15 +6,17 @@ import {
   adminListUsersController,
   adminUpdateUserController,
 } from '../controllers/admin-user.controller';
+import { createUserByAdminController } from '../controllers/user.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { validateRequest } from '../middleware/validation.middleware';
-import { adminUpdateUserSchema } from '../validators/user.validator';
+import { adminUpdateUserSchema, createUserByAdminSchema } from '../validators/user.validator';
 
 const router = Router();
 
 router.use(authenticate, authorize(UserRole.ADMIN, UserRole.SUPER_ADMIN));
 
 router.get('/', adminListUsersController);
+router.post('/', validateRequest(createUserByAdminSchema), createUserByAdminController);
 router.get('/:id', adminGetUserByIdController);
 router.patch('/:id', validateRequest(adminUpdateUserSchema), adminUpdateUserController);
 router.delete('/:id', adminDeleteUserController);

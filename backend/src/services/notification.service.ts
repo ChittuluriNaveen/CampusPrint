@@ -4,11 +4,28 @@ import { AppError } from '../services/auth.service';
 import { NotificationQueryInput } from '../validators/notification.validator';
 
 export const createNotification = async (
-  userId: string,
-  title: string,
-  message: string,
-  type: NotificationType = NotificationType.INFO
+  userIdOrOptions: string | { userId: string; title: string; message: string; type?: NotificationType },
+  titleArg?: string,
+  messageArg?: string,
+  typeArg: NotificationType = NotificationType.INFO
 ) => {
+  let userId: string;
+  let title: string;
+  let message: string;
+  let type: NotificationType;
+
+  if (typeof userIdOrOptions === 'object') {
+    userId = userIdOrOptions.userId;
+    title = userIdOrOptions.title;
+    message = userIdOrOptions.message;
+    type = userIdOrOptions.type || NotificationType.INFO;
+  } else {
+    userId = userIdOrOptions;
+    title = titleArg || '';
+    message = messageArg || '';
+    type = typeArg;
+  }
+
   try {
     return await prisma.notification.create({
       data: {

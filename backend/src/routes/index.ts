@@ -6,11 +6,13 @@ import adminUserRoutes from './admin-user.routes';
 import authRoutes from './auth.routes';
 import cartRoutes from './cart.routes';
 import documentRoutes from './document.routes';
+import inventoryRoutes from './inventory.routes';
 import notificationRoutes from './notification.routes';
 import orderRoutes from './order.routes';
 import paymentRoutes from './payment.routes';
 import pricingRoutes from './pricing.routes';
 import printJobRoutes from './printJob.routes';
+import printerRoutes from './printer.routes';
 import userRoutes from './user.routes';
 
 import healthRoutes from './health.routes';
@@ -44,6 +46,8 @@ apiV1Router.use('/admin/payments', paymentRoutes);
 apiV1Router.use('/print-jobs', printJobRoutes);
 apiV1Router.use('/notifications', notificationRoutes);
 apiV1Router.use('/analytics', analyticsRoutes);
+apiV1Router.use('/inventory', inventoryRoutes);
+apiV1Router.use('/', printerRoutes);
 
 // Mount versioned router
 router.use('/v1', apiV1Router);

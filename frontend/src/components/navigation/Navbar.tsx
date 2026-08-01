@@ -1,6 +1,8 @@
 import React from 'react';
-import { Printer, Sun, Moon, Menu } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { Printer, Sun, Moon, Menu, LogIn, LogOut, User, Settings } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { Avatar } from '../ui/Avatar';
 import { Dropdown } from '../ui/Dropdown';
 import { Button } from '../ui/Button';
@@ -13,12 +15,28 @@ export interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileMenu, portalName = 'Student Portal' }) => {
   const { theme, toggleTheme } = useTheme();
+  const { user, isAuthenticated, logout } = useAuth();
+  const navigate = useNavigate();
 
-  const userMenuItems = [
-    { label: 'View Profile', onClick: () => {}, icon: <Avatar name="Student User" size="sm" /> },
-    { label: 'Settings', onClick: () => {} },
-    { label: 'Sign Out', onClick: () => {}, danger: true },
-  ];
+  const handleSignOut = () => {
+    logout();
+    navigate('/login');
+  };
+
+  const userMenuItems = isAuthenticated
+    ? [
+        {
+          label: user?.name || 'User Profile',
+          onClick: () => navigate('/settings'),
+          icon: <Avatar name={user?.name || 'User'} size="sm" />,
+        },
+        { label: 'Settings', onClick: () => navigate('/settings'), icon: <Settings className="w-4 h-4" /> },
+        { label: 'Sign Out', onClick: handleSignOut, danger: true, icon: <LogOut className="w-4 h-4" /> },
+      ]
+    : [
+        { label: 'Sign In', onClick: () => navigate('/login'), icon: <LogIn className="w-4 h-4" /> },
+        { label: 'Register', onClick: () => navigate('/register'), icon: <User className="w-4 h-4" /> },
+      ];
 
   return (
     <header className="sticky top-0 z-30 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 transition-colors">
@@ -34,7 +52,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileMenu, portalName =
             </button>
           )}
 
-          <a href="/" className="flex items-center space-x-2.5 group">
+          <Link to="/" className="flex items-center space-x-2.5 group">
             <div className="p-2 bg-brand-600 text-white rounded-lg group-hover:bg-brand-700 transition-colors shadow-sm">
               <Printer className="w-5 h-5" />
             </div>
@@ -46,7 +64,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileMenu, portalName =
                 {portalName}
               </span>
             </div>
-          </a>
+          </Link>
         </div>
 
         <div className="flex items-center space-x-3">
@@ -64,14 +82,31 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileMenu, portalName =
 
           <div className="h-4 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1 hidden sm:block" />
 
-          <Dropdown
-            trigger={
-              <button className="flex items-center space-x-2 p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-                <Avatar name="Student User" size="sm" />
-              </button>
-            }
-            items={userMenuItems}
-          />
+          {isAuthenticated ? (
+            <Dropdown
+              trigger={
+                <button className="flex items-center space-x-2 p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                  <Avatar name={user?.name || 'Student'} size="sm" />
+                </button>
+              }
+              items={userMenuItems}
+            />
+          ) : (
+            <div className="flex items-center space-x-2">
+              <Link
+                to="/login"
+                className="px-3.5 py-1.5 text-xs font-semibold text-brand-600 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-950 rounded-lg transition-colors border border-brand-200 dark:border-brand-800"
+              >
+                Sign In
+              </Link>
+              <Link
+                to="/register"
+                className="px-3.5 py-1.5 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-lg shadow-sm transition-colors"
+              >
+                Register
+              </Link>
+            </div>
+          )}
         </div>
       </div>
     </header>
