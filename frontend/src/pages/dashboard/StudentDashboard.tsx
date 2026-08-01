@@ -42,7 +42,7 @@ interface RecentOrder {
   total: number;
   createdAt: string;
   files: Array<{ originalFileName: string; copies: number }>;
-  printJob?: { jobNumber: string; status: string; priority: number };
+  printJob?: { jobNumber: string; status: string; priority: number; queuePosition?: number };
 }
 
 interface RecentDocument {
@@ -390,11 +390,18 @@ export const StudentDashboard: React.FC = () => {
                       📄 {order.files?.[0]?.originalFileName || 'Document Package'}
                       {order.files?.length > 1 ? ` (+${order.files.length - 1} more)` : ''}
                     </p>
-                    {order.printJob && (
-                      <span className="inline-block text-[11px] text-indigo-600 dark:text-indigo-400 font-mono">
-                        Job: {order.printJob.jobNumber}
-                      </span>
-                    )}
+                    <div className="flex items-center space-x-2">
+                      {order.printJob && (
+                        <span className="inline-block text-[11px] text-indigo-600 dark:text-indigo-400 font-mono font-semibold">
+                          Job: {order.printJob.jobNumber}
+                        </span>
+                      )}
+                      {(order.status === 'QUEUED' || order.status === 'PRINTING' || order.printJob?.queuePosition) && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-100 text-indigo-800 dark:bg-indigo-950/80 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                          Queue #{order.printJob?.queuePosition || 1}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div className="flex items-center justify-between sm:justify-end gap-4">

@@ -28,6 +28,7 @@ interface AdminOrderItem {
   pickupCode?: string;
   pickupVerificationAttempts?: number;
   remarks?: string;
+  printJob?: { notes?: string };
   createdAt: string;
   user?: { name: string; email: string; studentId?: string };
   files?: Array<{
@@ -347,24 +348,47 @@ export const AdminOrderManagementPage: React.FC = () => {
                   <div className="p-3 bg-rose-50 dark:bg-rose-950/40 rounded-xl border border-rose-200 dark:border-rose-900 flex items-center space-x-2 text-rose-700 dark:text-rose-300 text-xs font-semibold">
                     <XCircle className="w-4 h-4 flex-shrink-0 text-rose-600" />
                     <span>
-                      Order Cancelled by Student before printing started.
+                      {order.remarks || order.printJob?.notes || 'Order Cancelled'}
                     </span>
                   </div>
                 )}
 
-                {/* Counter Payment Option */}
+                {/* Payment Action Banner */}
                 {isAwaitingPayment && (
-                  <div className="p-3 bg-amber-50 dark:bg-amber-950/40 rounded-xl border border-amber-200 dark:border-amber-900 flex items-center justify-between">
-                    <span className="text-xs text-amber-800 dark:text-amber-300 font-medium">
-                      Student chosen method: {order.paymentMethod || 'COUNTER_CASH'}
-                    </span>
-                    <button
-                      onClick={() => handleConfirmCounterPayment(order.id, order.total)}
-                      className="px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-bold inline-flex items-center space-x-1"
-                    >
-                      <Building2 className="w-3.5 h-3.5" />
-                      <span>Record Counter Payment (₹{order.total.toFixed(2)})</span>
-                    </button>
+                  <div className="p-3 bg-amber-50 dark:bg-amber-950/40 rounded-xl border border-amber-200 dark:border-amber-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <span className="text-xs text-amber-800 dark:text-amber-300 font-medium block">
+                        Payment Mode:{' '}
+                        <span className="font-bold">
+                          {order.paymentMethod === 'ONLINE_RAZORPAY'
+                            ? 'Online Razorpay'
+                            : 'Pay at Print Shop Counter'}
+                        </span>
+                      </span>
+                      <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-0.5">
+                        {order.paymentMethod === 'ONLINE_RAZORPAY'
+                          ? '⚡ Student is completing online payment. Order automatically queues upon gateway verification (no manual approval needed).'
+                          : 'Student will pay cash at shop counter before printing.'}
+                      </p>
+                    </div>
+                    {order.paymentMethod !== 'ONLINE_RAZORPAY' ? (
+                      <button
+                        onClick={() => handleConfirmCounterPayment(order.id, order.total)}
+                        className="px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-bold inline-flex items-center space-x-1 flex-shrink-0"
+                      >
+                        <Building2 className="w-3.5 h-3.5" />
+                        <span>Record Counter Payment (₹{order.total.toFixed(2)})</span>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleConfirmCounterPayment(order.id, order.total)}
+                        className="px-3 py-1.5 bg-slate-700 hover:bg-slate-800 text-slate-200 rounded-lg text-xs font-semibold inline-flex items-center space-x-1 flex-shrink-0"
+                        title="If student decides to pay cash at counter instead of online"
+                      >
+                        <Building2 className="w-3.5 h-3.5" />
+                        <span>Override with Counter Cash (₹{order.total.toFixed(2)})</span>
+                      </button>
+                    )}
                   </div>
                 )}
 

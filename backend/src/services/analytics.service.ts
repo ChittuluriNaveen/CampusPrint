@@ -33,6 +33,8 @@ export const getDashboardAnalytics = async (query: AnalyticsQueryInput) => {
     const [
       totalOrders,
       completedOrders,
+      cancelledOrders,
+      activeOrders,
       totalRevenueAgg,
       orderRevenueAgg,
       totalUsers,
@@ -43,6 +45,8 @@ export const getDashboardAnalytics = async (query: AnalyticsQueryInput) => {
     ] = await Promise.all([
       prisma.order.count({ where: { status: { not: OrderStatus.DRAFT }, createdAt: dateRange } }),
       prisma.order.count({ where: { status: { in: [OrderStatus.COLLECTED, OrderStatus.COMPLETED] }, createdAt: dateRange } }),
+      prisma.order.count({ where: { status: { in: [OrderStatus.CANCELLED, OrderStatus.REJECTED] }, createdAt: dateRange } }),
+      prisma.order.count({ where: { status: { in: [OrderStatus.QUEUED, OrderStatus.PRINTING, OrderStatus.READY, OrderStatus.READY_FOR_PICKUP] }, createdAt: dateRange } }),
       prisma.payment.aggregate({
         _sum: { amount: true },
         where: { paymentStatus: PaymentStatus.SUCCESS, createdAt: dateRange },
@@ -89,6 +93,8 @@ export const getDashboardAnalytics = async (query: AnalyticsQueryInput) => {
         averageOrderValue,
         totalOrders,
         completedOrders,
+        cancelledOrders,
+        activeOrders,
         totalUsers,
         totalDocuments,
         paymentSuccessRate,
@@ -104,6 +110,8 @@ export const getDashboardAnalytics = async (query: AnalyticsQueryInput) => {
         averageOrderValue: 0,
         totalOrders: 0,
         completedOrders: 0,
+        cancelledOrders: 0,
+        activeOrders: 0,
         totalUsers: 0,
         totalDocuments: 0,
         paymentSuccessRate: 100,

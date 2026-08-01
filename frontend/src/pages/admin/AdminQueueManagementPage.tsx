@@ -10,10 +10,12 @@ interface PrintJobItem {
   status: string;
   priority: number;
   queuePosition: number;
+  notes?: string;
   createdAt: string;
   order?: {
     orderNumber: string;
     total: number;
+    remarks?: string;
     user?: { name: string; email: string };
   };
   operator?: { name: string; email: string } | null;
@@ -28,29 +30,17 @@ export const AdminQueueManagementPage: React.FC = () => {
   const fetchQueue = async () => {
     setLoading(true);
     try {
-      // 1. Try /print-queue endpoint first
-      const qRes = await apiClient.get('/print-queue');
-      const qData = qRes.data?.data;
-
-      if (Array.isArray(qData)) {
-        setJobs(qData);
-        setLoading(false);
-        return;
-      } else if (qData && Array.isArray(qData.queue)) {
-        setJobs(qData.queue);
-        setLoading(false);
-        return;
-      }
-
-      // 2. Fallback to /print-jobs endpoint
       const response = await apiClient.get('/print-jobs');
       const pjData = response.data?.data;
-      if (pjData?.printJobs) {
-        setJobs(pjData.printJobs);
-        setLoading(false);
-        return;
-      } else if (Array.isArray(pjData)) {
-        setJobs(pjData);
+      const queueList =
+        pjData?.jobs ||
+        pjData?.printJobs ||
+        pjData?.queue ||
+        (Array.isArray(pjData) ? pjData : null) ||
+        (Array.isArray(response.data) ? response.data : null);
+
+      if (Array.isArray(queueList)) {
+        setJobs(queueList);
         setLoading(false);
         return;
       }
@@ -93,7 +83,7 @@ export const AdminQueueManagementPage: React.FC = () => {
         id: 'pj-3',
         jobNumber: 'JOB-20260730-C303',
         orderId: 'ord-3',
-        status: 'COMPLETED',
+        status: 'COLLECTED',
         priority: 1,
         queuePosition: 3,
         createdAt: new Date(Date.now() - 3600000).toISOString(),
@@ -130,7 +120,8 @@ export const AdminQueueManagementPage: React.FC = () => {
       await apiClient.patch(`/print-jobs/${jobId}/status`, { status, printerId });
       fetchQueue();
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Failed to update job status');
+      const apiErr = err as { response?: { data?: { message?: string } } };
+      alert(apiErr.response?.data?.message || (err instanceof Error ? err.message : 'Failed to update job status'));
     }
   };
 
@@ -140,12 +131,15 @@ export const AdminQueueManagementPage: React.FC = () => {
       await apiClient.delete(`/print-jobs/${jobId}`);
       fetchQueue();
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Failed to cancel print job');
+      const apiErr = err as { response?: { data?: { message?: string } } };
+      alert(apiErr.response?.data?.message || (err instanceof Error ? err.message : 'Failed to cancel print job'));
     }
   };
 
   const filteredJobs = jobs.filter(job => {
     if (activeTab === 'ALL') return true;
+    if (activeTab === 'READY_FOR_PICKUP') return job.status === 'READY_FOR_PICKUP' || job.status === 'READY';
+    if (activeTab === 'COLLECTED') return job.status === 'COLLECTED' || job.status === 'COMPLETED';
     return job.status === activeTab;
   });
 
@@ -167,7 +161,7 @@ export const AdminQueueManagementPage: React.FC = () => {
 
       {/* Phase Filter Tabs */}
       <div className="flex space-x-1 bg-surface-light dark:bg-surface-dark border border-slate-200 dark:border-slate-800 p-1 rounded-xl overflow-x-auto no-scrollbar">
-        {['ALL', 'QUEUED', 'ASSIGNED', 'PRINTING', 'PAUSED', 'COLLECTED', 'CANCELLED', 'FAILED'].map(tab => (
+        {['ALL', 'QUEUED', 'PRINTING', 'QUALITY_CHECK', 'READY_FOR_PICKUP', 'COLLECTED', 'CANCELLED'].map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -177,7 +171,7 @@ export const AdminQueueManagementPage: React.FC = () => {
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            {tab}
+            {tab.replace('_', ' ')}
           </button>
         ))}
       </div>
@@ -248,58 +242,93 @@ export const AdminQueueManagementPage: React.FC = () => {
                       </div>
                     </td>
                     <td className="p-4">
-                      <select
-                        value={job.status}
-                        onChange={e => handleUpdateStatus(job.id, e.target.value)}
-                        className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold focus:outline-none"
-                      >
-                        <option value="QUEUED">QUEUED</option>
-                        <option value="PRINTING">PRINTING</option>
-                        <option value="QUALITY_CHECK">QUALITY CHECK</option>
-                        <option value="READY_FOR_PICKUP">READY FOR PICKUP</option>
-                        <option value="READY">READY</option>
-                        <option value="COLLECTED">COLLECTED</option>
-                      </select>
+                      {job.status === 'CANCELLED' ? (
+                        <span className="px-2 py-0.5 bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 rounded-full text-[10px] font-bold">
+                          {job.notes || job.order?.remarks || 'Cancelled'}
+                        </span>
+                      ) : (
+                        <select
+                          value={job.status}
+                          onChange={e => handleUpdateStatus(job.id, e.target.value)}
+                          className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold focus:outline-none"
+                        >
+                          {(job.status === 'QUEUED' || job.status === 'ASSIGNED') && (
+                            <>
+                              <option value="QUEUED">QUEUED</option>
+                              <option value="PRINTING">PRINTING</option>
+                              <option value="QUALITY_CHECK">QUALITY CHECK</option>
+                              <option value="READY_FOR_PICKUP">READY FOR PICKUP</option>
+                              <option value="COLLECTED">COLLECTED</option>
+                            </>
+                          )}
+                          {job.status === 'PRINTING' && (
+                            <>
+                              <option value="PRINTING">PRINTING</option>
+                              <option value="QUALITY_CHECK">QUALITY CHECK</option>
+                              <option value="READY_FOR_PICKUP">READY FOR PICKUP</option>
+                              <option value="COLLECTED">COLLECTED</option>
+                            </>
+                          )}
+                          {job.status === 'QUALITY_CHECK' && (
+                            <>
+                              <option value="QUALITY_CHECK">QUALITY CHECK</option>
+                              <option value="READY_FOR_PICKUP">READY FOR PICKUP</option>
+                              <option value="COLLECTED">COLLECTED</option>
+                            </>
+                          )}
+                          {(job.status === 'READY_FOR_PICKUP' || job.status === 'READY') && (
+                            <>
+                              <option value="READY_FOR_PICKUP">READY FOR PICKUP</option>
+                              <option value="COLLECTED">COLLECTED</option>
+                            </>
+                          )}
+                          {(job.status === 'COLLECTED' || job.status === 'COMPLETED') && (
+                            <option value="COLLECTED">COLLECTED</option>
+                          )}
+                        </select>
+                      )}
                     </td>
                     <td className="p-4 text-right">
                       <div className="flex items-center justify-end space-x-2">
-                        {job.status === 'QUEUED' || job.status === 'ASSIGNED' ? (
-                          <button
-                            onClick={() => handleUpdateStatus(job.id, 'PRINTING')}
-                            className="px-2.5 py-1 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold transition-colors inline-flex items-center space-x-1"
-                          >
-                            <Printer className="w-3.5 h-3.5" />
-                            <span>Print Now</span>
-                          </button>
-                        ) : null}
+                        {(job.status === 'QUEUED' || job.status === 'ASSIGNED') && (
+                          <>
+                            <button
+                              onClick={() => handleUpdateStatus(job.id, 'PRINTING')}
+                              className="px-2.5 py-1 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold transition-colors inline-flex items-center space-x-1"
+                            >
+                              <Printer className="w-3.5 h-3.5" />
+                              <span>Print Now</span>
+                            </button>
 
-                        {job.status === 'PRINTING' || job.status === 'QUALITY_CHECK' ? (
+                            <button
+                              onClick={() => handleCancelJob(job.id)}
+                              className="px-2 py-1 text-xs text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-lg font-medium transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </>
+                        )}
+
+                        {(job.status === 'PRINTING' || job.status === 'QUALITY_CHECK') && (
                           <button
                             onClick={() => handleUpdateStatus(job.id, 'READY_FOR_PICKUP')}
                             className="px-2.5 py-1 text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold transition-colors inline-flex items-center space-x-1 shadow-sm"
                           >
                             <span>Ready for Pickup</span>
                           </button>
-                        ) : null}
+                        )}
 
-                        {job.status === 'READY_FOR_PICKUP' || job.status === 'READY' ? (
+                        {(job.status === 'READY_FOR_PICKUP' || job.status === 'READY') && (
                           <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 rounded-full text-[10px] font-extrabold">
                             Ready for Pickup
                           </span>
-                        ) : null}
+                        )}
 
-                        {job.status === 'COLLECTED' || job.status === 'COMPLETED' ? (
+                        {(job.status === 'COLLECTED' || job.status === 'COMPLETED') && (
                           <span className="px-2 py-0.5 bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 rounded-full text-[10px] font-extrabold">
                             Collected
                           </span>
-                        ) : null}
-
-                        <button
-                          onClick={() => handleCancelJob(job.id)}
-                          className="px-2 py-1 text-xs text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-lg font-medium transition-colors"
-                        >
-                          Cancel
-                        </button>
+                        )}
                       </div>
                     </td>
                   </tr>

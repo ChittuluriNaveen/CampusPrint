@@ -1,4 +1,4 @@
-import { NotificationType, OrderStatus, Prisma, UserRole } from '@prisma/client';
+import { NotificationType, OrderStatus, PrinterStatus, QueueStatus, Prisma, UserRole } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../services/auth.service';
 import { createNotification } from './notification.service';
@@ -13,17 +13,17 @@ import {
 } from '../validators/printJob.validator';
 
 const ALLOWED_JOB_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  DRAFT: [],
-  SUBMITTED: [],
-  PENDING_REVIEW: [],
-  ACCEPTED: [],
-  PAYMENT_PENDING: [],
-  PAID: [OrderStatus.QUEUED],
-  QUEUED: [OrderStatus.PRINTING, OrderStatus.CANCELLED],
-  PRINTING: [OrderStatus.QUALITY_CHECK, OrderStatus.READY, OrderStatus.READY_FOR_PICKUP, OrderStatus.CANCELLED],
-  QUALITY_CHECK: [OrderStatus.READY, OrderStatus.READY_FOR_PICKUP, OrderStatus.PRINTING, OrderStatus.CANCELLED],
-  READY: [OrderStatus.READY_FOR_PICKUP, OrderStatus.COLLECTED, OrderStatus.COMPLETED, OrderStatus.CANCELLED],
-  READY_FOR_PICKUP: [OrderStatus.COLLECTED, OrderStatus.COMPLETED, OrderStatus.CANCELLED],
+  DRAFT: [OrderStatus.QUEUED, OrderStatus.PRINTING, OrderStatus.CANCELLED],
+  SUBMITTED: [OrderStatus.QUEUED, OrderStatus.PRINTING, OrderStatus.CANCELLED],
+  PENDING_REVIEW: [OrderStatus.QUEUED, OrderStatus.PRINTING, OrderStatus.CANCELLED],
+  ACCEPTED: [OrderStatus.QUEUED, OrderStatus.PRINTING, OrderStatus.CANCELLED],
+  PAYMENT_PENDING: [OrderStatus.QUEUED, OrderStatus.PRINTING, OrderStatus.CANCELLED],
+  PAID: [OrderStatus.QUEUED, OrderStatus.PRINTING, OrderStatus.READY_FOR_PICKUP, OrderStatus.CANCELLED],
+  QUEUED: [OrderStatus.PRINTING, OrderStatus.QUALITY_CHECK, OrderStatus.READY_FOR_PICKUP, OrderStatus.CANCELLED],
+  PRINTING: [OrderStatus.QUALITY_CHECK, OrderStatus.READY_FOR_PICKUP, OrderStatus.COLLECTED, OrderStatus.COMPLETED],
+  QUALITY_CHECK: [OrderStatus.READY_FOR_PICKUP, OrderStatus.COLLECTED, OrderStatus.COMPLETED],
+  READY: [OrderStatus.READY_FOR_PICKUP, OrderStatus.COLLECTED, OrderStatus.COMPLETED],
+  READY_FOR_PICKUP: [OrderStatus.COLLECTED, OrderStatus.COMPLETED],
   COLLECTED: [OrderStatus.COMPLETED],
   COMPLETED: [],
   REJECTED: [],
@@ -268,6 +268,65 @@ export const updatePrintJobStatus = async (
       data: { status: input.status },
     });
 
+    // Synchronize PrintQueue table entry
+    const printQueueItem = await tx.printQueue.findUnique({ where: { orderId: job.orderId } });
+    const assignedPrinterId = input.printerId || printQueueItem?.assignedPrinterId;
+
+    if (printQueueItem) {
+      let targetQueueStatus: QueueStatus = QueueStatus.QUEUED;
+      if (input.status === OrderStatus.PRINTING) targetQueueStatus = QueueStatus.PRINTING;
+      else if (
+        input.status === OrderStatus.READY_FOR_PICKUP ||
+        input.status === OrderStatus.READY ||
+        input.status === OrderStatus.COLLECTED ||
+        input.status === OrderStatus.COMPLETED
+      ) {
+        targetQueueStatus = QueueStatus.COMPLETED;
+      } else if (input.status === OrderStatus.CANCELLED) {
+        targetQueueStatus = QueueStatus.CANCELLED;
+      }
+
+      await tx.printQueue.update({
+        where: { id: printQueueItem.id },
+        data: {
+          status: targetQueueStatus,
+          ...(assignedPrinterId && { assignedPrinterId }),
+        },
+      });
+    }
+
+    // Synchronize Printer status
+    if (assignedPrinterId) {
+      if (input.status === OrderStatus.PRINTING) {
+        await tx.printer.update({
+          where: { id: assignedPrinterId },
+          data: { status: PrinterStatus.PRINTING },
+        });
+      } else if (
+        input.status === OrderStatus.READY_FOR_PICKUP ||
+        input.status === OrderStatus.READY ||
+        input.status === OrderStatus.COLLECTED ||
+        input.status === OrderStatus.COMPLETED ||
+        input.status === OrderStatus.CANCELLED
+      ) {
+        // Check if there are other jobs actively PRINTING on this printer
+        const activePrintingJobs = await tx.printQueue.count({
+          where: {
+            assignedPrinterId,
+            status: QueueStatus.PRINTING,
+            ...(printQueueItem?.id && { id: { not: printQueueItem.id } }),
+          },
+        });
+
+        if (activePrintingJobs === 0) {
+          await tx.printer.update({
+            where: { id: assignedPrinterId },
+            data: { status: PrinterStatus.ONLINE },
+          });
+        }
+      }
+    }
+
     return updated;
   });
 
@@ -373,24 +432,72 @@ export const cancelPrintJob = async (jobId: string, actorId: string, notes?: str
     throw new AppError(404, 'Print job not found');
   }
 
-  if (job.status === OrderStatus.COLLECTED || job.status === OrderStatus.CANCELLED) {
-    throw new AppError(400, `Cannot cancel print job in status '${job.status}'`);
+  if (
+    job.status === OrderStatus.PRINTING ||
+    job.status === OrderStatus.QUALITY_CHECK ||
+    job.status === OrderStatus.READY ||
+    job.status === OrderStatus.READY_FOR_PICKUP ||
+    job.status === OrderStatus.COLLECTED ||
+    job.status === OrderStatus.COMPLETED ||
+    job.status === OrderStatus.CANCELLED
+  ) {
+    throw new AppError(
+      400,
+      `Cannot cancel print job in status '${job.status}'. Cancellation is prohibited once printing has started.`
+    );
   }
+
+  const actor = await prisma.user.findUnique({ where: { id: actorId }, select: { role: true } });
+  const cancelledByText =
+    actor?.role === UserRole.STUDENT
+      ? 'Student Cancelled'
+      : actor?.role === UserRole.OPERATOR
+      ? 'Operator Cancelled'
+      : 'Admin Cancelled';
+  const cancelNote = notes ? `${cancelledByText}: ${notes}` : cancelledByText;
 
   const cancelled = await prisma.$transaction(async tx => {
     const updated = await tx.printJob.update({
       where: { id: jobId },
       data: {
         status: OrderStatus.CANCELLED,
-        ...(notes && { notes: `Cancelled: ${notes}` }),
+        notes: cancelNote,
       },
       include: { order: true },
     });
 
     await tx.order.update({
       where: { id: job.orderId },
-      data: { status: OrderStatus.CANCELLED },
+      data: {
+        status: OrderStatus.CANCELLED,
+        remarks: cancelNote,
+      },
     });
+
+    // Synchronize PrintQueue entry & Printer status on cancellation
+    const printQueueItem = await tx.printQueue.findUnique({ where: { orderId: job.orderId } });
+    if (printQueueItem) {
+      await tx.printQueue.update({
+        where: { id: printQueueItem.id },
+        data: { status: QueueStatus.CANCELLED },
+      });
+
+      if (printQueueItem.assignedPrinterId) {
+        const activePrinting = await tx.printQueue.count({
+          where: {
+            assignedPrinterId: printQueueItem.assignedPrinterId,
+            status: QueueStatus.PRINTING,
+            id: { not: printQueueItem.id },
+          },
+        });
+        if (activePrinting === 0) {
+          await tx.printer.update({
+            where: { id: printQueueItem.assignedPrinterId },
+            data: { status: PrinterStatus.ONLINE },
+          });
+        }
+      }
+    }
 
     return updated;
   });

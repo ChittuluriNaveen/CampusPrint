@@ -43,6 +43,7 @@ interface OrderItem {
   rejectedReason?: string;
   pickupCode?: string;
   pickupVerifiedAt?: string;
+  remarks?: string;
   createdAt: string;
   files: OrderFileItem[];
   printJob?: {
@@ -50,6 +51,7 @@ interface OrderItem {
     status: string;
     priority: number;
     queuePosition: number;
+    notes?: string;
   };
 }
 
@@ -293,6 +295,12 @@ export const OrdersPage: React.FC = () => {
                     <span className="px-3 py-1 rounded-full text-xs font-bold bg-brand-100 dark:bg-brand-950 text-brand-700 dark:text-brand-300 border border-brand-200 dark:border-brand-900">
                       {order.status.replace('_', ' ')}
                     </span>
+                    {(order.status === 'QUEUED' || order.status === 'PRINTING' || order.printJob?.queuePosition) && (
+                      <span className="px-3 py-1 rounded-full text-xs font-extrabold bg-indigo-100 dark:bg-indigo-950 text-indigo-800 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-800 shadow-sm flex items-center space-x-1">
+                        <Printer className="w-3.5 h-3.5 text-indigo-600 animate-pulse" />
+                        <span>Queue Position: #{order.printJob?.queuePosition || 1}</span>
+                      </span>
+                    )}
                   </div>
                   <span className="text-xs text-slate-500">
                     Submitted: {new Date(order.createdAt).toLocaleString()}
@@ -354,7 +362,7 @@ export const OrdersPage: React.FC = () => {
                   <div className="p-3 bg-rose-50 dark:bg-rose-950/40 rounded-xl border border-rose-200 dark:border-rose-900 flex items-center space-x-2 text-rose-700 dark:text-rose-300 text-xs font-semibold">
                     <XCircle className="w-4 h-4 flex-shrink-0 text-rose-600" />
                     <span>
-                      Order Cancelled: {order.priceAdjustmentReason || 'Cancelled by student before printing started.'}
+                      {order.remarks || order.printJob?.notes || 'Order Cancelled'}
                     </span>
                   </div>
                 )}

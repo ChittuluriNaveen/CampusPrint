@@ -18,11 +18,11 @@ import {
 import { createNotification } from './notification.service';
 
 const ALLOWED_STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  DRAFT: [OrderStatus.SUBMITTED, OrderStatus.PENDING_REVIEW, OrderStatus.PAYMENT_PENDING, OrderStatus.CANCELLED],
-  SUBMITTED: [OrderStatus.PENDING_REVIEW, OrderStatus.ACCEPTED, OrderStatus.REJECTED, OrderStatus.CANCELLED],
-  PENDING_REVIEW: [OrderStatus.ACCEPTED, OrderStatus.REJECTED, OrderStatus.CANCELLED],
-  ACCEPTED: [OrderStatus.PAYMENT_PENDING, OrderStatus.PAID, OrderStatus.CANCELLED],
-  PAYMENT_PENDING: [OrderStatus.PAID, OrderStatus.CANCELLED],
+  DRAFT: [OrderStatus.SUBMITTED, OrderStatus.PENDING_REVIEW, OrderStatus.PAYMENT_PENDING, OrderStatus.QUEUED, OrderStatus.CANCELLED],
+  SUBMITTED: [OrderStatus.PENDING_REVIEW, OrderStatus.ACCEPTED, OrderStatus.PAYMENT_PENDING, OrderStatus.QUEUED, OrderStatus.REJECTED, OrderStatus.CANCELLED],
+  PENDING_REVIEW: [OrderStatus.ACCEPTED, OrderStatus.QUEUED, OrderStatus.REJECTED, OrderStatus.CANCELLED],
+  ACCEPTED: [OrderStatus.PAYMENT_PENDING, OrderStatus.PAID, OrderStatus.QUEUED, OrderStatus.CANCELLED],
+  PAYMENT_PENDING: [OrderStatus.PAID, OrderStatus.QUEUED, OrderStatus.CANCELLED],
   PAID: [OrderStatus.QUEUED, OrderStatus.PRINTING, OrderStatus.REFUNDED, OrderStatus.CANCELLED],
   QUEUED: [OrderStatus.PRINTING, OrderStatus.CANCELLED, OrderStatus.REFUNDED],
   PRINTING: [OrderStatus.QUALITY_CHECK, OrderStatus.READY, OrderStatus.READY_FOR_PICKUP, OrderStatus.REFUNDED],
@@ -560,11 +560,19 @@ export const cancelOrder = async (
     );
   }
 
+  const cancelledByText =
+    userRole === UserRole.STUDENT
+      ? 'Student Cancelled'
+      : userRole === UserRole.OPERATOR
+      ? 'Operator Cancelled'
+      : 'Admin Cancelled';
+  const cancelRemark = remarks ? `${cancelledByText}: ${remarks}` : cancelledByText;
+
   const cancelledOrder = await prisma.order.update({
     where: { id: orderId },
     data: {
       status: OrderStatus.CANCELLED,
-      ...(remarks && { remarks: `${order.remarks ? order.remarks + ' | ' : ''}Cancelled: ${remarks}` }),
+      remarks: cancelRemark,
     },
     include: {
       files: true,
@@ -574,7 +582,10 @@ export const cancelOrder = async (
   // Cancel associated print job if created
   await prisma.printJob.updateMany({
     where: { orderId },
-    data: { status: OrderStatus.CANCELLED },
+    data: {
+      status: OrderStatus.CANCELLED,
+      notes: cancelRemark,
+    },
   });
 
   await prisma.activityLog.create({
@@ -736,31 +747,48 @@ export const adminUpdateOrderStatus = async (
   let notifyTitle = `Order Status: ${newStatus}`;
   let notifyMsg = `Your print order ${order.orderNumber} is now ${newStatus}.`;
 
-  // Sync printJob status if printJob exists
-  try {
-    await prisma.printJob.updateMany({
-      where: { orderId },
-      data: {
-        status: newStatus as OrderStatus,
-        ...(newStatus === OrderStatus.PRINTING && { startedAt: new Date() }),
-        ...(newStatus === OrderStatus.COLLECTED && { completedAt: new Date() }),
-      },
-    });
-  } catch (pjErr) {
-    console.warn('Failed to sync print job status:', pjErr);
-  }
-
-  // Automatically enqueue paid/accepted orders into Intelligent Print Queue
+  // Automatically enqueue paid/accepted/queued orders into Intelligent Print Queue
+  let queueEntry: any = null;
   if (
     newStatus === OrderStatus.ACCEPTED ||
     newStatus === OrderStatus.QUEUED ||
     newStatus === OrderStatus.PRINTING
   ) {
     try {
-      await ensureOrderQueueEntry(orderId, printerId);
+      queueEntry = await ensureOrderQueueEntry(orderId, printerId);
     } catch (qErr) {
       console.warn('Failed to enqueue order into print queue:', qErr);
     }
+  }
+
+  // Sync or create printJob status
+  try {
+    const existingJob = await prisma.printJob.findUnique({ where: { orderId } });
+    if (!existingJob && newStatus === OrderStatus.QUEUED) {
+      const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      const suffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+      await prisma.printJob.create({
+        data: {
+          jobNumber: `JOB-${dateStr}-${suffix}`,
+          orderId,
+          status: OrderStatus.QUEUED,
+          priority: 1,
+          queuePosition: queueEntry?.queuePosition || 1,
+        },
+      });
+    } else if (existingJob) {
+      await prisma.printJob.update({
+        where: { id: existingJob.id },
+        data: {
+          status: newStatus as OrderStatus,
+          ...(queueEntry?.queuePosition && { queuePosition: queueEntry.queuePosition }),
+          ...(newStatus === OrderStatus.PRINTING && { startedAt: new Date() }),
+          ...(newStatus === OrderStatus.COLLECTED && { completedAt: new Date() }),
+        },
+      });
+    }
+  } catch (pjErr) {
+    console.warn('Failed to sync or create print job status:', pjErr);
   }
 
   if (newStatus === OrderStatus.PRINTING) {

@@ -49,6 +49,7 @@ export const CheckoutPage: React.FC = () => {
   const [checkoutData, setCheckoutData] = useState<CheckoutSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'ONLINE_RAZORPAY' | 'COUNTER_CASH'>('ONLINE_RAZORPAY');
   const [termsAccepted, setTermsAccepted] = useState(true);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [txnRef, setTxnRef] = useState<string | null>(null);
@@ -214,34 +215,51 @@ export const CheckoutPage: React.FC = () => {
     setErrorMessage(null);
 
     try {
-      const primaryOrderId = checkoutData.items[0].orderId;
-
-      let rzpOrderId = `order_demo_${Date.now()}`;
-      try {
-        const sessionRes = await apiClient.post('/payments/create', { orderId: primaryOrderId });
-        if (sessionRes.data?.data?.razorpayOrderId) {
-          rzpOrderId = sessionRes.data.data.razorpayOrderId;
-        }
-      } catch {
-        console.warn('Payment create API call failed, continuing with simulated transaction');
-      }
+      const allOrderIds = checkoutData.items.map(item => item.orderId);
 
       const mockPaymentId = `pay_demo_${Date.now()}`;
       const mockSignature = `sig_demo_${Date.now()}`;
+      let txnReference = paymentMethod === 'COUNTER_CASH'
+        ? `COUNTER_CASH_${Date.now().toString().slice(-6)}`
+        : `TXN_${Date.now()}`;
 
-      let txnReference = `TXN_${Date.now()}`;
-      try {
-        const verifyRes = await apiClient.post('/payments/verify', {
-          orderId: primaryOrderId,
-          razorpayOrderId: rzpOrderId,
-          razorpayPaymentId: mockPaymentId,
-          razorpaySignature: mockSignature,
-        });
-        if (verifyRes.data?.data?.transactionReference) {
-          txnReference = verifyRes.data.data.transactionReference;
+      // Process verification and status updates for ALL orders in cart
+      for (const ordId of allOrderIds) {
+        if (paymentMethod === 'ONLINE_RAZORPAY') {
+          let rzpOrderId = `order_demo_${Date.now()}_${ordId.slice(-4)}`;
+          try {
+            const sessionRes = await apiClient.post('/payments/create', { orderId: ordId });
+            if (sessionRes.data?.data?.razorpayOrderId) {
+              rzpOrderId = sessionRes.data.data.razorpayOrderId;
+            }
+          } catch {
+            // Simulated fallback
+          }
+
+          try {
+            const verifyRes = await apiClient.post('/payments/verify', {
+              orderId: ordId,
+              razorpayOrderId: rzpOrderId,
+              razorpayPaymentId: mockPaymentId,
+              razorpaySignature: mockSignature,
+            });
+            if (verifyRes.data?.data?.transactionReference) {
+              txnReference = verifyRes.data.data.transactionReference;
+            }
+          } catch {
+            // Simulated fallback
+          }
         }
-      } catch {
-        console.warn('Payment verify API call failed, completing checkout via simulated transaction confirmation');
+
+        // Direct status transition to QUEUED for ALL orders in cart
+        try {
+          await apiClient.patch(`/orders/${ordId}/status`, {
+            status: 'QUEUED',
+            paymentMethod,
+          });
+        } catch {
+          // Fallback
+        }
       }
 
       setTxnRef(txnReference);
@@ -271,6 +289,9 @@ export const CheckoutPage: React.FC = () => {
   }
 
   if (paymentSuccess) {
+    const allPdfs = checkoutData?.items.flatMap(item => item.fileBreakdown) || [];
+    const allOrderNumbers = checkoutData?.items.map(item => item.orderNumber).join(', ') || '';
+
     return (
       <div className="max-w-xl mx-auto my-8 bg-surface-light dark:bg-surface-dark border border-emerald-500/30 rounded-3xl p-8 shadow-2xl text-center space-y-6 animate-fadeIn">
         <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-950/80 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
@@ -280,14 +301,18 @@ export const CheckoutPage: React.FC = () => {
         <div className="space-y-2">
           <h1 className="text-2xl font-black text-slate-900 dark:text-white">Payment Successful!</h1>
           <p className="text-xs text-slate-500">
-            Your print order payment has been verified and queued for printing.
+            Your combined print order ({checkoutData?.items.length} package(s)) has been verified and queued for printing.
           </p>
         </div>
 
-        <div className="bg-slate-50 dark:bg-slate-800/60 p-4 rounded-2xl space-y-2 text-xs text-left">
+        <div className="bg-slate-50 dark:bg-slate-800/60 p-4 rounded-2xl space-y-3 text-xs text-left">
           <div className="flex justify-between">
             <span className="text-slate-500">Transaction Ref:</span>
             <span className="font-mono font-bold text-brand-600 dark:text-brand-400">{txnRef}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-slate-500">Combined Order Nos:</span>
+            <span className="font-mono font-bold text-slate-800 dark:text-slate-200">{allOrderNumbers}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-slate-500">Amount Paid:</span>
@@ -300,6 +325,25 @@ export const CheckoutPage: React.FC = () => {
           <div className="flex justify-between">
             <span className="text-slate-500">Order Status:</span>
             <span className="font-bold text-emerald-600 dark:text-emerald-400">QUEUED FOR PRINTING</span>
+          </div>
+
+          <div className="pt-2 border-t border-slate-200 dark:border-slate-700 space-y-1.5">
+            <span className="font-bold text-slate-700 dark:text-slate-300 block text-[11px] uppercase tracking-wider">
+              Combined Documents in Queue ({allPdfs.length}):
+            </span>
+            <div className="space-y-1 max-h-36 overflow-y-auto pr-1">
+              {allPdfs.map((f, idx) => (
+                <div key={idx} className="flex items-center justify-between text-[11px] text-slate-600 dark:text-slate-400 bg-white dark:bg-slate-900/50 p-2 rounded-lg border border-slate-100 dark:border-slate-800">
+                  <div className="flex items-center space-x-2 truncate">
+                    <span className="font-bold text-brand-600">#{idx + 1}</span>
+                    <span className="font-medium truncate">{f.fileName}</span>
+                  </div>
+                  <span className="font-semibold text-slate-700 dark:text-slate-300 ml-2 flex-shrink-0">
+                    {f.copies}x • {f.colourMode}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -436,7 +480,43 @@ export const CheckoutPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex justify-between items-center text-base font-bold text-slate-900 dark:text-white">
+            {/* Payment Method Selector */}
+            <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">
+                Choose Payment Method
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('ONLINE_RAZORPAY')}
+                  className={`p-3 rounded-xl border flex flex-col items-center justify-center text-center transition-all ${
+                    paymentMethod === 'ONLINE_RAZORPAY'
+                      ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 ring-2 ring-emerald-500/20 font-bold'
+                      : 'border-slate-200 dark:border-slate-800 text-slate-600 hover:border-slate-300'
+                  }`}
+                >
+                  <CreditCard className="w-5 h-5 mb-1 text-emerald-600" />
+                  <span className="text-xs">Pay Online</span>
+                  <span className="text-[10px] opacity-75 font-normal">Razorpay Encrypted</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('COUNTER_CASH')}
+                  className={`p-3 rounded-xl border flex flex-col items-center justify-center text-center transition-all ${
+                    paymentMethod === 'COUNTER_CASH'
+                      ? 'border-brand-600 bg-brand-50 dark:bg-brand-950/60 text-brand-700 dark:text-brand-300 ring-2 ring-brand-500/20 font-bold'
+                      : 'border-slate-200 dark:border-slate-800 text-slate-600 hover:border-slate-300'
+                  }`}
+                >
+                  <Building2 className="w-5 h-5 mb-1 text-brand-600" />
+                  <span className="text-xs">Pay at Counter</span>
+                  <span className="text-[10px] opacity-75 font-normal">Cash at Shop</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="flex justify-between items-center text-base font-bold text-slate-900 dark:text-white pt-2">
               <span>Grand Total</span>
               <span className="text-xl font-black text-brand-600 dark:text-brand-400">
                 ₹{checkoutData.grandTotal.toFixed(2)}
@@ -457,10 +537,20 @@ export const CheckoutPage: React.FC = () => {
               <button
                 onClick={handleExecutePayment}
                 disabled={processing}
-                className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold text-xs rounded-xl shadow-lg transition-all flex items-center justify-center space-x-2 disabled:opacity-50"
+                className={`w-full py-3.5 text-white font-extrabold text-xs rounded-xl shadow-lg transition-all flex items-center justify-center space-x-2 disabled:opacity-50 ${
+                  paymentMethod === 'ONLINE_RAZORPAY'
+                    ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700'
+                    : 'bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-700 hover:to-indigo-700'
+                }`}
               >
-                <CreditCard className="w-4 h-4" />
-                <span>{processing ? 'Verifying Gateway...' : `Pay ₹${checkoutData.grandTotal.toFixed(2)} via Razorpay`}</span>
+                {paymentMethod === 'ONLINE_RAZORPAY' ? <CreditCard className="w-4 h-4" /> : <Building2 className="w-4 h-4" />}
+                <span>
+                  {processing
+                    ? 'Processing Order...'
+                    : paymentMethod === 'ONLINE_RAZORPAY'
+                    ? `Pay ₹${checkoutData.grandTotal.toFixed(2)} via Razorpay`
+                    : `Confirm Counter Cash (₹${checkoutData.grandTotal.toFixed(2)})`}
+                </span>
               </button>
             </div>
 

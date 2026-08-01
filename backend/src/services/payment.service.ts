@@ -4,6 +4,7 @@ import { AppError } from '../services/auth.service';
 import { clearUserCart } from '../services/cart.service';
 import { paymentGateway } from '../services/gateway.service';
 import { createNotification } from './notification.service';
+import { ensureOrderQueueEntry } from './printer.service';
 import { VerifyPaymentInput } from '../validators/payment.validator';
 
 const generateTxnReference = (): string => {
@@ -111,12 +112,25 @@ export const verifyPayment = async (userId: string, input: VerifyPaymentInput) =
     throw new AppError(403, 'Access denied: You do not own this print order');
   }
 
-  const payment = await prisma.payment.findUnique({
+  let payment = await prisma.payment.findUnique({
     where: { orderId: order.id },
   });
 
   if (!payment) {
-    throw new AppError(404, 'Payment session record not found');
+    const txnRef = generateTxnReference();
+    payment = await prisma.payment.create({
+      data: {
+        orderId: order.id,
+        userId,
+        gateway: 'RAZORPAY',
+        razorpayOrderId: input.razorpayOrderId || `order_${Date.now()}`,
+        transactionReference: txnRef,
+        amount: order.total,
+        currency: 'INR',
+        paymentStatus: PaymentStatus.CREATED,
+        verificationStatus: 'PENDING',
+      },
+    });
   }
 
   const isValidSignature = paymentGateway.verifyPaymentSignature(
@@ -177,6 +191,9 @@ export const verifyPayment = async (userId: string, input: VerifyPaymentInput) =
     data: { status: OrderStatus.QUEUED },
   });
 
+  // Ensure PrintQueue entry is created for real-time queue position tracking
+  const queueEntry = await ensureOrderQueueEntry(order.id);
+
   // Ensure PrintJob entry exists for the newly queued order
   try {
     const existingJob = await prisma.printJob.findUnique({ where: { orderId: order.id } });
@@ -189,6 +206,15 @@ export const verifyPayment = async (userId: string, input: VerifyPaymentInput) =
           orderId: order.id,
           status: OrderStatus.QUEUED,
           priority: 1,
+          queuePosition: queueEntry?.queuePosition || 1,
+        },
+      });
+    } else {
+      await prisma.printJob.update({
+        where: { id: existingJob.id },
+        data: {
+          status: OrderStatus.QUEUED,
+          queuePosition: queueEntry?.queuePosition || existingJob.queuePosition || 1,
         },
       });
     }

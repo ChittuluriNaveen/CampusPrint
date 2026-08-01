@@ -13,6 +13,7 @@ export const updatePrintJobStatusSchema = z.object({
     errorMap: () => ({ message: 'Invalid print job status' }),
   }),
   notes: z.string().max(500).optional(),
+  printerId: z.string().optional(),
 });
 
 export const assignOperatorSchema = z.object({

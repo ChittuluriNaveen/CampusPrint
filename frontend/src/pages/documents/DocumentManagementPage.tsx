@@ -11,8 +11,6 @@ import {
   X,
   Printer,
   Sliders,
-  CreditCard,
-  Building2,
   ShoppingCart,
 } from 'lucide-react';
 import { apiClient } from '../../services/apiClient';
@@ -46,7 +44,6 @@ export const DocumentManagementPage: React.FC = () => {
   const [orientation, setOrientation] = useState('portrait');
   const [binding, setBinding] = useState(false);
   const [lamination, setLamination] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'ONLINE_RAZORPAY' | 'COUNTER_CASH'>('ONLINE_RAZORPAY');
   const [submittingRequest, setSubmittingRequest] = useState(false);
 
   const fetchDocuments = async () => {
@@ -116,48 +113,8 @@ export const DocumentManagementPage: React.FC = () => {
     }
   };
 
-  const handleCreatePrintRequest = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!printDoc) return;
-
-    setSubmittingRequest(true);
-    try {
-      await apiClient.post('/orders', {
-        documentId: printDoc.id,
-        paymentMethod,
-        files: [
-          {
-            documentId: printDoc.id,
-            originalFileName: printDoc.originalFileName,
-            storedFileName: printDoc.originalFileName,
-            mimeType: printDoc.mimeType,
-            size: printDoc.size,
-            pageCount: printDoc.pageCount,
-            copies,
-            paperSize,
-            colourMode,
-            duplexMode,
-            orientation,
-            binding,
-            lamination,
-            pageRange: pageRange === 'All' ? null : pageRange,
-          },
-        ],
-      });
-      setMessage({
-        type: 'success',
-        text: `Print Request for "${printDoc.originalFileName}" submitted successfully! Track progress on your dashboard.`,
-      });
-      setPrintDoc(null);
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to submit print request';
-      setMessage({ type: 'error', text: errorMessage });
-    } finally {
-      setSubmittingRequest(false);
-    }
-  };
-
-  const handleAddToCart = async () => {
+  const handleAddToCart = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!printDoc) return;
 
     setSubmittingRequest(true);
@@ -165,7 +122,7 @@ export const DocumentManagementPage: React.FC = () => {
       const orderRes = await apiClient.post('/orders', {
         documentId: printDoc.id,
         status: 'DRAFT',
-        paymentMethod,
+        paymentMethod: 'ONLINE_RAZORPAY',
         files: [
           {
             documentId: printDoc.id,
@@ -191,7 +148,7 @@ export const DocumentManagementPage: React.FC = () => {
 
       setMessage({
         type: 'success',
-        text: `"${printDoc.originalFileName}" configured and added to your Shopping Cart!`,
+        text: `"${printDoc.originalFileName}" configured and added to your Cart! Go to Cart to proceed with checkout.`,
       });
       setPrintDoc(null);
     } catch (err: unknown) {
@@ -381,7 +338,7 @@ export const DocumentManagementPage: React.FC = () => {
               </button>
             </div>
 
-            <form onSubmit={handleCreatePrintRequest} className="space-y-4">
+            <form onSubmit={handleAddToCart} className="space-y-4">
               <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl flex items-center space-x-3">
                 <FileText className="w-5 h-5 text-brand-600" />
                 <div>
@@ -489,37 +446,7 @@ export const DocumentManagementPage: React.FC = () => {
                 </label>
               </div>
 
-              {/* Payment Method Selection */}
-              <div className="pt-2">
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-2">Payment Method</label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod('ONLINE_RAZORPAY')}
-                    className={`p-3 rounded-xl border flex items-center space-x-2 text-xs font-medium transition-colors ${
-                      paymentMethod === 'ONLINE_RAZORPAY'
-                        ? 'border-brand-600 bg-brand-50 dark:bg-brand-950 text-brand-700 dark:text-brand-300'
-                        : 'border-slate-200 dark:border-slate-800 text-slate-600'
-                    }`}
-                  >
-                    <CreditCard className="w-4 h-4" />
-                    <span>Pay Online (Razorpay)</span>
-                  </button>
 
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod('COUNTER_CASH')}
-                    className={`p-3 rounded-xl border flex items-center space-x-2 text-xs font-medium transition-colors ${
-                      paymentMethod === 'COUNTER_CASH'
-                        ? 'border-brand-600 bg-brand-50 dark:bg-brand-950 text-brand-700 dark:text-brand-300'
-                        : 'border-slate-200 dark:border-slate-800 text-slate-600'
-                    }`}
-                  >
-                    <Building2 className="w-4 h-4" />
-                    <span>Pay at Print Shop Counter</span>
-                  </button>
-                </div>
-              </div>
 
               {/* Estimated Price Display */}
               <div className="p-4 bg-brand-50 dark:bg-brand-950/40 rounded-xl border border-brand-200 dark:border-brand-900 flex items-center justify-between">
@@ -541,21 +468,12 @@ export const DocumentManagementPage: React.FC = () => {
                   Cancel
                 </button>
                 <button
-                  type="button"
-                  onClick={handleAddToCart}
-                  disabled={submittingRequest}
-                  className="w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white shadow-md transition-colors disabled:opacity-50 inline-flex items-center justify-center space-x-1.5"
-                >
-                  <ShoppingCart className="w-4 h-4" />
-                  <span>Add to Cart</span>
-                </button>
-                <button
                   type="submit"
                   disabled={submittingRequest}
-                  className="w-full sm:w-auto px-5 py-2 rounded-xl text-xs font-bold bg-brand-600 text-white hover:bg-brand-700 shadow-md transition-colors disabled:opacity-50 inline-flex items-center justify-center space-x-1.5"
+                  className="w-full sm:w-auto px-5 py-2 rounded-xl text-xs font-bold bg-brand-600 hover:bg-brand-700 text-white shadow-md transition-colors disabled:opacity-50 inline-flex items-center justify-center space-x-1.5"
                 >
-                  <Printer className="w-4 h-4" />
-                  <span>{submittingRequest ? 'Submitting...' : 'Submit Print Request'}</span>
+                  <ShoppingCart className="w-4 h-4" />
+                  <span>{submittingRequest ? 'Adding to Cart...' : 'Save & Add to Cart'}</span>
                 </button>
               </div>
             </form>

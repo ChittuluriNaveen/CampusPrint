@@ -6,10 +6,11 @@ import {
   ShoppingBag,
   Clock,
   Download,
-  CheckCircle2,
   RefreshCw,
   Printer,
   Calendar,
+  XCircle,
+  PackageCheck,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -21,6 +22,8 @@ interface DashboardKPIs {
   averageOrderValue: number;
   totalOrders: number;
   completedOrders: number;
+  cancelledOrders: number;
+  activeOrders: number;
   totalUsers: number;
   totalDocuments: number;
   paymentSuccessRate: number;
@@ -36,6 +39,8 @@ export const AdminAnalyticsReportsPage: React.FC = () => {
     averageOrderValue: 0,
     totalOrders: 0,
     completedOrders: 0,
+    cancelledOrders: 0,
+    activeOrders: 0,
     totalUsers: 0,
     totalDocuments: 0,
     paymentSuccessRate: 100,
@@ -125,7 +130,6 @@ export const AdminAnalyticsReportsPage: React.FC = () => {
 
   const maxRevenue = Math.max(...trendData.map(t => t.revenue), 1);
   const peakRevenue = Math.max(...trendData.map(t => t.revenue), 0);
-  const completionRate = kpis.totalOrders > 0 ? ((kpis.completedOrders / kpis.totalOrders) * 100).toFixed(1) : '100';
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 animate-fadeIn">
@@ -185,73 +189,89 @@ export const AdminAnalyticsReportsPage: React.FC = () => {
       </div>
 
       {/* KPI Metric Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <Card className="shadow-md border-slate-200/80 dark:border-slate-800">
-          <CardContent className="p-5 flex items-center justify-between">
+          <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">Total Revenue</p>
-              <h3 className="text-2xl font-black text-slate-900 dark:text-white mt-1">
+              <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Total Revenue</p>
+              <h3 className="text-xl font-black text-slate-900 dark:text-white mt-1">
                 ₹{kpis.totalRevenue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </h3>
-              <div className="flex items-center space-x-1 text-xs text-emerald-600 dark:text-emerald-400 font-semibold mt-1">
+              <div className="flex items-center space-x-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1">
                 <TrendingUp className="w-3.5 h-3.5" />
-                <span>+12.4% vs last period</span>
+                <span>Gross Income</span>
               </div>
             </div>
-            <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 rounded-2xl">
-              <DollarSign className="w-6 h-6" />
+            <div className="p-2.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 rounded-2xl">
+              <DollarSign className="w-5 h-5" />
             </div>
           </CardContent>
         </Card>
 
         <Card className="shadow-md border-slate-200/80 dark:border-slate-800">
-          <CardContent className="p-5 flex items-center justify-between">
+          <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">Total Orders</p>
-              <h3 className="text-2xl font-black text-slate-900 dark:text-white mt-1">
+              <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Total Orders</p>
+              <h3 className="text-xl font-black text-slate-900 dark:text-white mt-1">
                 {kpis.totalOrders}
               </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                {kpis.completedOrders} completed ({((kpis.completedOrders / (kpis.totalOrders || 1)) * 100).toFixed(0)}%)
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                Submitted orders
               </p>
             </div>
-            <div className="p-3 bg-primary-50 dark:bg-primary-950/40 text-primary-600 rounded-2xl">
-              <ShoppingBag className="w-6 h-6" />
+            <div className="p-2.5 bg-primary-50 dark:bg-primary-950/40 text-primary-600 rounded-2xl">
+              <ShoppingBag className="w-5 h-5" />
             </div>
           </CardContent>
         </Card>
 
         <Card className="shadow-md border-slate-200/80 dark:border-slate-800">
-          <CardContent className="p-5 flex items-center justify-between">
+          <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">Payment Success</p>
-              <h3 className="text-2xl font-black text-slate-900 dark:text-white mt-1">
-                {kpis.paymentSuccessRate}%
+              <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Collected & Done</p>
+              <h3 className="text-xl font-black text-emerald-600 dark:text-emerald-400 mt-1">
+                {kpis.completedOrders}
               </h3>
-              <div className="flex items-center space-x-1 text-xs text-emerald-600 dark:text-emerald-400 font-semibold mt-1">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>Gateway healthy</span>
-              </div>
+              <p className="text-[11px] text-emerald-700 dark:text-emerald-300 font-semibold mt-1">
+                {((kpis.completedOrders / (kpis.totalOrders || 1)) * 100).toFixed(0)}% fulfillment
+              </p>
             </div>
-            <div className="p-3 bg-sky-50 dark:bg-sky-950/40 text-sky-600 rounded-2xl">
-              <CheckCircle2 className="w-6 h-6" />
+            <div className="p-2.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 rounded-2xl">
+              <PackageCheck className="w-5 h-5" />
             </div>
           </CardContent>
         </Card>
 
         <Card className="shadow-md border-slate-200/80 dark:border-slate-800">
-          <CardContent className="p-5 flex items-center justify-between">
+          <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">Avg Turnaround</p>
-              <h3 className="text-2xl font-black text-slate-900 dark:text-white mt-1">
-                {kpis.avgFulfillmentTimeMinutes} min
+              <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Active Pipeline</p>
+              <h3 className="text-xl font-black text-amber-600 dark:text-amber-400 mt-1">
+                {kpis.activeOrders}
               </h3>
-              <p className="text-xs text-amber-600 dark:text-amber-400 font-semibold mt-1">
-                {kpis.queuedPrintJobs} jobs currently queued
+              <p className="text-[11px] text-amber-700 dark:text-amber-300 font-semibold mt-1">
+                Queued / Printing / Ready
               </p>
             </div>
-            <div className="p-3 bg-amber-50 dark:bg-amber-950/40 text-amber-600 rounded-2xl">
-              <Clock className="w-6 h-6" />
+            <div className="p-2.5 bg-amber-50 dark:bg-amber-950/40 text-amber-600 rounded-2xl">
+              <Clock className="w-5 h-5" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-md border-slate-200/80 dark:border-slate-800">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Cancelled / Rejected</p>
+              <h3 className="text-xl font-black text-rose-600 dark:text-rose-400 mt-1">
+                {kpis.cancelledOrders}
+              </h3>
+              <p className="text-[11px] text-rose-700 dark:text-rose-300 font-semibold mt-1">
+                Stopped orders
+              </p>
+            </div>
+            <div className="p-2.5 bg-rose-50 dark:bg-rose-950/40 text-rose-600 rounded-2xl">
+              <XCircle className="w-5 h-5" />
             </div>
           </CardContent>
         </Card>
@@ -328,32 +348,40 @@ export const AdminAnalyticsReportsPage: React.FC = () => {
           <CardContent className="p-6 space-y-5">
             <div>
               <div className="flex justify-between text-xs font-semibold mb-1.5">
-                <span className="text-slate-600 dark:text-slate-400">Order Completion Rate</span>
-                <span className="text-emerald-600 font-bold">{completionRate}%</span>
+                <span className="text-slate-600 dark:text-slate-400">Order Outcome Breakdown</span>
+                <span className="text-slate-800 dark:text-slate-200 font-bold">{kpis.totalOrders} total</span>
               </div>
-              <div className="w-full h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${completionRate}%` }} />
+              <div className="w-full h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden flex">
+                <div
+                  className="h-full bg-emerald-500"
+                  style={{ width: `${(kpis.completedOrders / (kpis.totalOrders || 1)) * 100}%` }}
+                  title={`Collected: ${kpis.completedOrders}`}
+                />
+                <div
+                  className="h-full bg-amber-500"
+                  style={{ width: `${(kpis.activeOrders / (kpis.totalOrders || 1)) * 100}%` }}
+                  title={`Active: ${kpis.activeOrders}`}
+                />
+                <div
+                  className="h-full bg-rose-500"
+                  style={{ width: `${(kpis.cancelledOrders / (kpis.totalOrders || 1)) * 100}%` }}
+                  title={`Cancelled: ${kpis.cancelledOrders}`}
+                />
+              </div>
+              <div className="flex items-center justify-between text-[11px] text-slate-500 mt-1.5">
+                <span className="text-emerald-600 font-semibold">● Collected ({kpis.completedOrders})</span>
+                <span className="text-amber-600 font-semibold">● Active ({kpis.activeOrders})</span>
+                <span className="text-rose-600 font-semibold">● Cancelled ({kpis.cancelledOrders})</span>
               </div>
             </div>
 
             <div>
               <div className="flex justify-between text-xs font-semibold mb-1.5">
-                <span className="text-slate-600 dark:text-slate-400">B&W vs Colour Print Ratio</span>
-                <span className="text-primary-600 font-bold">72% B&W / 28% Colour</span>
-              </div>
-              <div className="w-full h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden flex">
-                <div className="h-full bg-slate-700" style={{ width: '72%' }} />
-                <div className="h-full bg-amber-500" style={{ width: '28%' }} />
-              </div>
-            </div>
-
-            <div>
-              <div className="flex justify-between text-xs font-semibold mb-1.5">
-                <span className="text-slate-600 dark:text-slate-400">Payment Gateway Success</span>
-                <span className="text-sky-600 font-bold">98.4%</span>
+                <span className="text-slate-600 dark:text-slate-400">Payment Gateway Success Rate</span>
+                <span className="text-sky-600 font-bold">{kpis.paymentSuccessRate}%</span>
               </div>
               <div className="w-full h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                <div className="h-full bg-sky-500 rounded-full" style={{ width: '98.4%' }} />
+                <div className="h-full bg-sky-500 rounded-full" style={{ width: `${kpis.paymentSuccessRate}%` }} />
               </div>
             </div>
 
