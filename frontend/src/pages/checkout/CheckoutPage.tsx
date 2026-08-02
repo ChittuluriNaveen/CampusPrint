@@ -77,7 +77,7 @@ export const CheckoutPage: React.FC = () => {
       const cartSummary = cartRes.data?.data;
 
       if (cartSummary && cartSummary.items && cartSummary.items.length > 0) {
-        let userOrders: any[] = [];
+        let userOrders: Record<string, unknown>[] = [];
         try {
           const ordersRes = await apiClient.get('/orders');
           userOrders = ordersRes.data?.data?.orders || [];
@@ -91,12 +91,12 @@ export const CheckoutPage: React.FC = () => {
         for (const cartItem of cartSummary.items) {
           const orderId = cartItem.orderId;
           orderIds.push(orderId);
-          const matchingOrder = userOrders.find((o: { id: string }) => o.id === orderId);
+          const matchingOrder = userOrders.find((o: Record<string, unknown>) => o.id === orderId) as { files?: Record<string, unknown>[] } | undefined;
 
           const files = matchingOrder?.files || [];
           const fileBreakdown =
             files.length > 0
-              ? files.map((f: any) => ({
+              ? files.map((f: Record<string, unknown>) => ({
                   fileName: f.originalFileName || f.fileName || 'Print Document.pdf',
                   paperSize: f.paperSize || 'A4',
                   colourMode: f.colourMode || 'BW',

@@ -1,8 +1,7 @@
-import { PrinterStatus, QueuePriority, QueueStatus } from '@prisma/client';
+import { PrinterStatus, QueuePriority } from '@prisma/client';
 import {
   assignQueuePrinterSchema,
   createPrinterSchema,
-  updatePrinterStatusSchema,
   updateQueuePrioritySchema,
 } from '../validators/printer.validator';
 

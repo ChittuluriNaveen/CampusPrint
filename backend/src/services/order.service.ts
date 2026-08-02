@@ -755,7 +755,7 @@ export const adminUpdateOrderStatus = async (
   }
 
   // Automatically enqueue paid/accepted/queued orders into Intelligent Print Queue
-  let queueEntry: any = null;
+  let queueEntry: { queuePosition?: number } | null = null;
   if (
     newStatus === OrderStatus.ACCEPTED ||
     newStatus === OrderStatus.QUEUED ||

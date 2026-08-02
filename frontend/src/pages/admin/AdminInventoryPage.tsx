@@ -556,7 +556,7 @@ export const AdminInventoryPage: React.FC = () => {
                 <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Adjustment Type</label>
                 <select
                   value={adjustType}
-                  onChange={e => setAdjustType(e.target.value as any)}
+                  onChange={e => setAdjustType(e.target.value as StockTransactionType)}
                   className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-bold"
                 >
                   <option value="STOCK_IN">Manual Stock In (+ Add)</option>
@@ -726,7 +726,7 @@ export const AdminInventoryPage: React.FC = () => {
                   <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Category</label>
                   <select
                     value={newItemCategory}
-                    onChange={e => setNewItemCategory(e.target.value as any)}
+                    onChange={e => setNewItemCategory(e.target.value as InventoryCategory)}
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-bold"
                   >
                     <option value="PAPER">PAPER</option>

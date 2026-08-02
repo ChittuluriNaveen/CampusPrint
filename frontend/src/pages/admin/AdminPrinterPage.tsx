@@ -22,7 +22,22 @@ export const AdminPrinterPage: React.FC = () => {
   const [summary, setSummary] = useState<PrinterDashboardSummary | null>(null);
   const [printers, setPrinters] = useState<Printer[]>([]);
   const [queueItems, setQueueItems] = useState<PrintQueueItem[]>([]);
-  const [reports, setReports] = useState<any | null>(null);
+  const [reports, setReports] = useState<{
+    printerUtilizationReport?: {
+      printerName: string;
+      printerCode: string;
+      dailyPrintedPages: number;
+      dailyCapacity: number;
+      utilizationRatePct: number;
+      status: string;
+    }[];
+    recentQueueHistory?: {
+      id: string;
+      performedBy: string;
+      createdAt: string;
+      notes: string;
+    }[];
+  } | null>(null);
   const [printingQueueItem, setPrintingQueueItem] = useState<PrintQueueItem | null>(null);
 
   // Filters State
@@ -87,8 +102,9 @@ export const AdminPrinterPage: React.FC = () => {
       const nextStatus = currentStatus === 'MAINTENANCE' ? 'ONLINE' : 'MAINTENANCE';
       await updatePrinterStatus(printerId, nextStatus, !isMaint);
       fetchData();
-    } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to update printer status');
+    } catch (err) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to update printer status';
+      alert(msg);
     }
   };
 
@@ -110,8 +126,9 @@ export const AdminPrinterPage: React.FC = () => {
         maxDailyCapacity: 2500,
       });
       fetchData();
-    } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to create printer');
+    } catch (err) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to create printer';
+      alert(msg);
     }
   };
 
@@ -124,8 +141,9 @@ export const AdminPrinterPage: React.FC = () => {
       setTargetPrinterId('');
       setOverrideReason('');
       fetchData();
-    } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to reassign printer');
+    } catch (err) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to reassign printer';
+      alert(msg);
     }
   };
 
@@ -133,8 +151,9 @@ export const AdminPrinterPage: React.FC = () => {
     try {
       await updateQueuePriority(queueId, priority);
       fetchData();
-    } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to update priority');
+    } catch (err) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to update priority';
+      alert(msg);
     }
   };
 
@@ -149,15 +168,16 @@ export const AdminPrinterPage: React.FC = () => {
         }
       }
       fetchData();
-    } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to toggle pause state');
+    } catch (err) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to toggle pause state';
+      alert(msg);
     }
   };
 
   const handleExportCSV = () => {
     if (!reports?.printerUtilizationReport) return;
     const headers = ['Printer Name', 'Code', 'Daily Pages Printed', 'Capacity', 'Utilization Rate %', 'Status'];
-    const rows = reports.printerUtilizationReport.map((r: any) => [
+    const rows = reports.printerUtilizationReport.map(r => [
       `"${r.printerName}"`,
       `"${r.printerCode}"`,
       r.dailyPrintedPages,
@@ -165,7 +185,7 @@ export const AdminPrinterPage: React.FC = () => {
       `${r.utilizationRatePct}%`,
       r.status,
     ]);
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e: any[]) => e.join(','))].join('\n');
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
@@ -536,7 +556,7 @@ export const AdminPrinterPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800">
-                  {reports.printerUtilizationReport?.map((r: any, idx: number) => (
+                  {reports.printerUtilizationReport?.map((r, idx: number) => (
                     <tr key={idx} className="hover:bg-slate-800/40">
                       <td className="py-2.5 font-medium text-white">{r.printerName}</td>
                       <td className="py-2.5">{r.dailyPrintedPages} / {r.dailyCapacity}</td>
@@ -551,7 +571,7 @@ export const AdminPrinterPage: React.FC = () => {
             <div className="bg-slate-800/60 border border-slate-800 rounded-xl p-4">
               <h3 className="font-semibold text-white text-sm mb-3">Recent Queue Audit Activity</h3>
               <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                {reports.recentQueueHistory?.map((h: any) => (
+                {reports.recentQueueHistory?.map(h => (
                   <div key={h.id} className="p-2 bg-slate-900/60 border border-slate-800 rounded text-xs">
                     <div className="flex justify-between text-slate-400 text-[10px]">
                       <span>{h.performedBy}</span>
