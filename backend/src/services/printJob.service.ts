@@ -314,7 +314,6 @@ export const updatePrintJobStatus = async (
           where: {
             assignedPrinterId,
             status: QueueStatus.PRINTING,
-            ...(printQueueItem?.id && { id: { not: printQueueItem.id } }),
           },
         });
 

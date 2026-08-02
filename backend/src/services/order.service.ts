@@ -2,7 +2,7 @@ import { OrderStatus, PaymentMethod, PaymentStatus, Prisma, UserRole } from '@pr
 import { prisma } from '../lib/prisma';
 import { AppError } from '../services/auth.service';
 import { deductStockForCompletedOrder } from '../services/inventory.service';
-import { ensureOrderQueueEntry } from '../services/printer.service';
+import { ensureOrderQueueEntry, syncOrderStatusQueueAndPrinter } from '../services/printer.service';
 import { calculateOrderPricing, ItemCostBreakdown } from '../services/pricing.service';
 import { generateOrderNumber } from '../utils/orderNumber';
 import { generatePickupCode } from '../utils/pickupCode';
@@ -747,6 +747,13 @@ export const adminUpdateOrderStatus = async (
   let notifyTitle = `Order Status: ${newStatus}`;
   let notifyMsg = `Your print order ${order.orderNumber} is now ${newStatus}.`;
 
+  // Sync queue entry and printer status (e.g. freeing printer to ONLINE when job finishes/moves to READY_FOR_PICKUP)
+  try {
+    await syncOrderStatusQueueAndPrinter(orderId, newStatus, printerId);
+  } catch (syncErr) {
+    console.warn('Failed to sync queue and printer status:', syncErr);
+  }
+
   // Automatically enqueue paid/accepted/queued orders into Intelligent Print Queue
   let queueEntry: any = null;
   if (
@@ -764,14 +771,14 @@ export const adminUpdateOrderStatus = async (
   // Sync or create printJob status
   try {
     const existingJob = await prisma.printJob.findUnique({ where: { orderId } });
-    if (!existingJob && newStatus === OrderStatus.QUEUED) {
+    if (!existingJob && (newStatus === OrderStatus.QUEUED || newStatus === OrderStatus.PRINTING)) {
       const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
       const suffix = Math.random().toString(36).substring(2, 6).toUpperCase();
       await prisma.printJob.create({
         data: {
           jobNumber: `JOB-${dateStr}-${suffix}`,
           orderId,
-          status: OrderStatus.QUEUED,
+          status: newStatus as OrderStatus,
           priority: 1,
           queuePosition: queueEntry?.queuePosition || 1,
         },

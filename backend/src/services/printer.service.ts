@@ -1,4 +1,4 @@
-import { PrinterStatus, QueuePriority, QueueStatus } from '@prisma/client';
+import { OrderStatus, PrinterStatus, QueuePriority, QueueStatus } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from './auth.service';
 import {
@@ -271,6 +271,12 @@ export const ensureOrderQueueEntry = async (orderId: string, printerId?: string)
           overrideReason: 'Selected by operator before printing',
         },
       });
+      if (printerId) {
+        await prisma.printer.update({
+          where: { id: printerId },
+          data: { status: PrinterStatus.PRINTING },
+        });
+      }
       return updated;
     }
     return existingQueue;
@@ -299,12 +305,79 @@ export const ensureOrderQueueEntry = async (orderId: string, printerId?: string)
         overrideReason: 'Selected by operator before printing',
       },
     });
+    await prisma.printer.update({
+      where: { id: printerId },
+      data: { status: PrinterStatus.PRINTING },
+    });
   } else {
     // Attempt auto assignment
     await autoAssignQueueJob(newQueue.id);
   }
 
   return newQueue;
+};
+
+export const syncOrderStatusQueueAndPrinter = async (
+  orderId: string,
+  newStatus: OrderStatus,
+  printerId?: string
+) => {
+  const queueItem = await prisma.printQueue.findUnique({ where: { orderId } });
+  const assignedPrinterId = printerId || queueItem?.assignedPrinterId;
+
+  if (queueItem) {
+    let targetQueueStatus: QueueStatus = QueueStatus.QUEUED;
+    if (newStatus === OrderStatus.PRINTING) {
+      targetQueueStatus = QueueStatus.PRINTING;
+    } else if (
+      newStatus === OrderStatus.READY_FOR_PICKUP ||
+      newStatus === OrderStatus.READY ||
+      newStatus === OrderStatus.COLLECTED ||
+      newStatus === OrderStatus.COMPLETED
+    ) {
+      targetQueueStatus = QueueStatus.COMPLETED;
+    } else if (newStatus === OrderStatus.CANCELLED) {
+      targetQueueStatus = QueueStatus.CANCELLED;
+    }
+
+    await prisma.printQueue.update({
+      where: { id: queueItem.id },
+      data: {
+        status: targetQueueStatus,
+        ...(assignedPrinterId && { assignedPrinterId }),
+      },
+    });
+  }
+
+  if (assignedPrinterId) {
+    if (newStatus === OrderStatus.PRINTING) {
+      await prisma.printer.update({
+        where: { id: assignedPrinterId },
+        data: { status: PrinterStatus.PRINTING },
+      });
+    } else if (
+      newStatus === OrderStatus.READY_FOR_PICKUP ||
+      newStatus === OrderStatus.READY ||
+      newStatus === OrderStatus.COLLECTED ||
+      newStatus === OrderStatus.COMPLETED ||
+      newStatus === OrderStatus.CANCELLED
+    ) {
+      const activePrintingJobs = await prisma.printQueue.count({
+        where: {
+          assignedPrinterId,
+          status: QueueStatus.PRINTING,
+          ...(queueItem?.id && { id: { not: queueItem.id } }),
+        },
+      });
+
+      if (activePrintingJobs === 0) {
+        await prisma.printer.update({
+          where: { id: assignedPrinterId },
+          data: { status: PrinterStatus.ONLINE },
+        });
+      }
+    }
+  }
 };
 
 // --- Print Queue Management ---
