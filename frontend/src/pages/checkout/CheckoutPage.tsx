@@ -91,19 +91,21 @@ export const CheckoutPage: React.FC = () => {
         for (const cartItem of cartSummary.items) {
           const orderId = cartItem.orderId;
           orderIds.push(orderId);
-          const matchingOrder = userOrders.find((o: Record<string, unknown>) => o.id === orderId) as { files?: Record<string, unknown>[] } | undefined;
+          const matchingOrder = userOrders.find((o: Record<string, unknown>) => o.id === orderId) as
+            | { files?: Record<string, unknown>[]; orderNumber?: string; total?: number }
+            | undefined;
 
           const files = matchingOrder?.files || [];
-          const fileBreakdown =
+          const fileBreakdown: CheckoutItem['fileBreakdown'] =
             files.length > 0
               ? files.map((f: Record<string, unknown>) => ({
-                  fileName: f.originalFileName || f.fileName || 'Print Document.pdf',
-                  paperSize: f.paperSize || 'A4',
-                  colourMode: f.colourMode || 'BW',
-                  duplexMode: f.duplexMode || 'SINGLE',
-                  copies: f.copies || 1,
-                  pageCount: f.pageCount || 1,
-                  calculatedPrice: f.calculatedPrice || (cartItem.unitPrice || 0),
+                  fileName: String(f.originalFileName || f.fileName || 'Print Document.pdf'),
+                  paperSize: String(f.paperSize || 'A4'),
+                  colourMode: String(f.colourMode || 'BW'),
+                  duplexMode: String(f.duplexMode || 'SINGLE'),
+                  copies: Number(f.copies || 1),
+                  pageCount: Number(f.pageCount || 1),
+                  calculatedPrice: Number(f.calculatedPrice || cartItem.unitPrice || 0),
                 }))
               : [
                   {
@@ -111,19 +113,19 @@ export const CheckoutPage: React.FC = () => {
                     paperSize: 'A4',
                     colourMode: 'BW',
                     duplexMode: 'SINGLE',
-                    copies: cartItem.quantity || 1,
+                    copies: Number(cartItem.quantity || 1),
                     pageCount: 1,
-                    calculatedPrice: cartItem.totalPrice || cartItem.unitPrice || 0,
+                    calculatedPrice: Number(cartItem.totalPrice || cartItem.unitPrice || 0),
                   },
                 ];
 
           activeItems.push({
             orderId,
-            orderNumber: cartItem.orderNumber || matchingOrder?.orderNumber || `ORD-${orderId.slice(0, 8)}`,
+            orderNumber: String(cartItem.orderNumber || matchingOrder?.orderNumber || `ORD-${orderId.slice(0, 8)}`),
             filesCount: files.length || 1,
-            quantity: cartItem.quantity || 1,
-            unitPrice: cartItem.unitPrice || matchingOrder?.total || 0,
-            totalPrice: cartItem.totalPrice || (cartItem.unitPrice * cartItem.quantity) || 0,
+            quantity: Number(cartItem.quantity || 1),
+            unitPrice: Number(cartItem.unitPrice || matchingOrder?.total || 0),
+            totalPrice: Number(cartItem.totalPrice || ((cartItem.unitPrice || 0) * (cartItem.quantity || 1)) || 0),
             fileBreakdown,
           });
         }
